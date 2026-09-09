@@ -1,4 +1,4 @@
-from storage_intelligence.server import mcp  # noqa: F401
+from storage_intelligence.server import mcp
 
 if __name__ == "__main__":
     mcp.run()
