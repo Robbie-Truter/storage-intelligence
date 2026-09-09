@@ -1,6 +1,4 @@
-def main():
-    print("Storage Intelligence")
-
+from storage_intelligence.server import mcp  # noqa: F401
 
 if __name__ == "__main__":
-    main()
+    mcp.run()
