@@ -6,3 +6,6 @@ from storage_intelligence.core import mcp
 
 # This file wires up all the primitives by importing them,
 # which triggers their registration with the MCP instance.
+
+if __name__ == "__main__":
+    mcp.run()
