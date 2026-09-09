@@ -1,0 +1,19 @@
+[project]
+name = "storage-intelligence"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Robbie-Truter", email = "timothylang6@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "fastmcp>=4.0.3",
+]
+
+[project.scripts]
+storage-intelligence = "storage_intelligence:main"
+
+[build-system]
+requires = ["uv_build>=0.12.10,<0.13.0"]
+build-backend = "uv_build"
