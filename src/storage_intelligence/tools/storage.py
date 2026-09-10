@@ -1,14 +1,19 @@
 from storage_intelligence.core import mcp
 from pathlib import Path
 
-# list_directory - what's in this folder?
-# count_files - how many .py files are in src/?
-# file_names - show me all .txt files here
-# directory_sizes - what's taking up space?
-# search_files - find all config files
-# file_info - when was this file last modified?
-# tree - show me the project structure
+# ===============================================
+# List of storage analysis tools, in the order they are implemented:
+# ===============================================
+# 1. list_directory - what's in this folder?
+# 2. count_files - how many files of each type are in this folder?
+# 3. file_names - show me all .txt files here
+# 4. directory_sizes - what's taking up space?
+# 5. search_files - find all files matching a pattern
+# 6. file_info - when was this file last modified?
+# 7. tree - show me the project structure
+# ===============================================
 
+# list_directory - what's in this folder?
 @mcp.tool()
 def list_directory(path: str) -> str:
     """List the contents of a directory with type indicators."""
@@ -21,7 +26,7 @@ def list_directory(path: str) -> str:
         entries.append(f"{prefix}{child.name}")
     return "\n".join(entries) if entries else "Directory is empty"
 
-
+# count_files - how many files of each type are in this folder?
 @mcp.tool()
 def count_files(path: str) -> dict:
     """Count files and directories in a directory, broken down by type."""
@@ -38,6 +43,7 @@ def count_files(path: str) -> dict:
     return {"total_files": total, "by_extension": dict(sorted(by_extension.items(), key=lambda x: -x[1]))}
 
 
+# file_names - show me all files with a given extension here
 @mcp.tool()
 def file_names(path: str, extension: str = "") -> list[str]:
     """List file names in a directory, optionally filtered by extension (e.g. '.py')."""
@@ -49,6 +55,7 @@ def file_names(path: str, extension: str = "") -> list[str]:
     return [f.name for f in p.iterdir() if f.is_file()]
 
 
+# directory_sizes - what's taking up space?
 @mcp.tool()
 def directory_sizes(path: str) -> list[dict]:
     """List top-level items in a directory with their sizes in human-readable format."""
@@ -73,6 +80,7 @@ def directory_sizes(path: str) -> list[dict]:
     return results
 
 
+# search_files - find all files matching a glob pattern
 @mcp.tool()
 def search_files(path: str, pattern: str) -> list[str]:
     """Search for files matching a glob pattern (e.g. '*.py', '**/*.txt')."""
@@ -82,6 +90,7 @@ def search_files(path: str, pattern: str) -> list[str]:
     return sorted(str(f) for f in p.glob(pattern))
 
 
+# file_info - when was this file last modified?
 @mcp.tool()
 def file_info(path: str) -> dict:
     """Get metadata about a file: size, created/modified times, type."""
@@ -100,6 +109,7 @@ def file_info(path: str) -> dict:
     }
 
 
+# tree - show me the project structure
 @mcp.tool()
 def tree(path: str, max_depth: int = 3) -> str:
     """Show a recursive directory tree up to max_depth levels."""
