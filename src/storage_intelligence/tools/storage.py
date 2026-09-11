@@ -1,4 +1,6 @@
+from fastmcp import Context
 from storage_intelligence.core import mcp
+from storage_intelligence.utils import path_error, unexpected_error
 from pathlib import Path
 
 # ===============================================
@@ -18,122 +20,164 @@ DEFAULT_PATH = str(Path.home())
 
 # list_directory - what's in this folder?
 @mcp.tool()
-def list_directory(path: str = DEFAULT_PATH) -> str:
+async def list_directory(ctx: Context, path: str = DEFAULT_PATH) -> str:
     """List the contents of a directory with type indicators."""
-    p = Path(path)
-    if not p.exists():
-        return f"Error: {path} does not exist"
-    entries = []
-    for child in sorted(p.iterdir()):
-        prefix = "📁 " if child.is_dir() else "📄 "
-        entries.append(f"{prefix}{child.name}")
-    return "\n".join(entries) if entries else "Directory is empty"
+    try:
+        p = Path(path)
+        if not p.exists():
+            await ctx.error(f"list_directory failed: {path} does not exist")
+            return path_error("list_directory", path)
+        await ctx.info(f"Listing directory: {path}")
+        entries = []
+        for child in sorted(p.iterdir()):
+            prefix = "📁 " if child.is_dir() else "📄 "
+            entries.append(f"{prefix}{child.name}")
+        return "\n".join(entries) if entries else "Directory is empty"
+    except Exception as exc:
+        await ctx.error(f"list_directory failed: {type(exc).__name__}: {exc}")
+        return unexpected_error("list_directory", path, exc)
 
 # count_files - how many files of each type are in this folder?
 @mcp.tool()
-def count_files(path: str = DEFAULT_PATH) -> dict:
+async def count_files(ctx: Context, path: str = DEFAULT_PATH) -> dict:
     """Count files and directories in a directory, broken down by type."""
-    p = Path(path)
-    if not p.exists():
-        return {"error": f"{path} does not exist"}
-    total = 0
-    by_extension: dict[str, int] = {}
-    for child in p.iterdir():
-        if child.is_file():
-            total += 1
-            ext = child.suffix.lower() or "(no extension)"
-            by_extension[ext] = by_extension.get(ext, 0) + 1
-    return {"total_files": total, "by_extension": dict(sorted(by_extension.items(), key=lambda x: -x[1]))}
+    try:
+        p = Path(path)
+        if not p.exists():
+            await ctx.error(f"count_files failed: {path} does not exist")
+            return path_error("count_files", path)
+        await ctx.info(f"Counting files in: {path}")
+        total = 0
+        by_extension: dict[str, int] = {}
+        for child in p.iterdir():
+            if child.is_file():
+                total += 1
+                ext = child.suffix.lower() or "(no extension)"
+                by_extension[ext] = by_extension.get(ext, 0) + 1
+        return {"total_files": total, "by_extension": dict(sorted(by_extension.items(), key=lambda x: -x[1]))}
+    except Exception as exc:
+        await ctx.error(f"count_files failed: {type(exc).__name__}: {exc}")
+        return unexpected_error("count_files", path, exc)
 
 
 # file_names - show me all files with a given extension here
 @mcp.tool()
-def file_names(path: str = DEFAULT_PATH, extension: str = "") -> list[str]:
+async def file_names(ctx: Context, path: str = DEFAULT_PATH, extension: str = "") -> list[str]:
     """List file names in a directory, optionally filtered by extension (e.g. '.py')."""
-    p = Path(path)
-    if not p.exists():
-        return [f"Error: {path} does not exist"]
-    if extension:
-        return [f.name for f in p.iterdir() if f.is_file() and f.suffix.lower() == extension.lower()]
-    return [f.name for f in p.iterdir() if f.is_file()]
+    try:
+        p = Path(path)
+        if not p.exists():
+            await ctx.error(f"file_names failed: {path} does not exist")
+            return path_error("file_names", path)
+        await ctx.info(f"Listing file names in: {path}" + (f" (extension={extension})" if extension else ""))
+        if extension:
+            return [f.name for f in p.iterdir() if f.is_file() and f.suffix.lower() == extension.lower()]
+        return [f.name for f in p.iterdir() if f.is_file()]
+    except Exception as exc:
+        await ctx.error(f"file_names failed: {type(exc).__name__}: {exc}")
+        return unexpected_error("file_names", path, exc)
 
 
 # directory_sizes - what's taking up space?
 @mcp.tool()
-def directory_sizes(path: str = DEFAULT_PATH) -> list[dict]:
+async def directory_sizes(ctx: Context, path: str = DEFAULT_PATH) -> list[dict]:
     """List top-level items in a directory with their sizes in human-readable format."""
-    p = Path(path)
-    if not p.exists():
-        return [{"error": f"{path} does not exist"}]
+    try:
+        p = Path(path)
+        if not p.exists():
+            await ctx.error(f"directory_sizes failed: {path} does not exist")
+            return path_error("directory_sizes", path)
 
-    def human_size(nbytes: int) -> str:
-        for unit in ("B", "KB", "MB", "GB", "TB"):
-            if abs(nbytes) < 1024:
-                return f"{nbytes:.1f} {unit}"
-            nbytes /= 1024
-        return f"{nbytes:.1f} PB"
+        def human_size(nbytes: int) -> str:
+            for unit in ("B", "KB", "MB", "GB", "TB"):
+                if abs(nbytes) < 1024:
+                    return f"{nbytes:.1f} {unit}"
+                nbytes /= 1024
+            return f"{nbytes:.1f} PB"
 
-    results = []
-    for child in sorted(p.iterdir()):
-        if child.is_file():
-            results.append({"name": child.name, "type": "file", "size": human_size(child.stat().st_size)})
-        else:
-            file_count = sum(1 for _ in child.rglob("*") if _.is_file())
-            results.append({"name": child.name, "type": "directory", "files": file_count})
-    return results
+        await ctx.info(f"Computing directory sizes in: {path}")
+        results = []
+        for child in sorted(p.iterdir()):
+            if child.is_file():
+                results.append({"name": child.name, "type": "file", "size": human_size(child.stat().st_size)})
+            else:
+                file_count = sum(1 for _ in child.rglob("*") if _.is_file())
+                results.append({"name": child.name, "type": "directory", "files": file_count})
+        return results
+    except Exception as exc:
+        await ctx.error(f"directory_sizes failed: {type(exc).__name__}: {exc}")
+        return unexpected_error("directory_sizes", path, exc)
 
 
 # search_files - find all files matching a glob pattern
 @mcp.tool()
-def search_files(path: str = DEFAULT_PATH, pattern: str = "*") -> list[str]:
+async def search_files(ctx: Context, path: str = DEFAULT_PATH, pattern: str = "*") -> list[str]:
     """Search for files matching a glob pattern (e.g. '*.py', '**/*.txt')."""
-    p = Path(path)
-    if not p.exists():
-        return [f"Error: {path} does not exist"]
-    return sorted(str(f) for f in p.glob(pattern))
+    try:
+        p = Path(path)
+        if not p.exists():
+            await ctx.error(f"search_files failed: {path} does not exist")
+            return path_error("search_files", path)
+        await ctx.info(f"Searching for '{pattern}' in: {path}")
+        return sorted(str(f) for f in p.glob(pattern))
+    except Exception as exc:
+        await ctx.error(f"search_files failed: {type(exc).__name__}: {exc}")
+        return unexpected_error("search_files", path, exc)
 
 
 # file_info - when was this file last modified?
 @mcp.tool()
-def file_info(path: str = DEFAULT_PATH) -> dict:
+async def file_info(ctx: Context, path: str = DEFAULT_PATH) -> dict:
     """Get metadata about a file: size, created/modified times, type."""
-    p = Path(path)
-    if not p.exists():
-        return {"error": f"{path} does not exist"}
-    stat = p.stat()
-    return {
-        "name": p.name,
-        "path": str(p),
-        "type": "directory" if p.is_dir() else "file",
-        "size_bytes": stat.st_size,
-        "modified": stat.st_mtime,
-        "created": stat.st_ctime,
-        "extension": p.suffix,
-    }
+    try:
+        p = Path(path)
+        if not p.exists():
+            await ctx.error(f"file_info failed: {path} does not exist")
+            return path_error("file_info", path)
+        await ctx.info(f"Getting metadata for: {path}")
+        stat = p.stat()
+        return {
+            "name": p.name,
+            "path": str(p),
+            "type": "directory" if p.is_dir() else "file",
+            "size_bytes": stat.st_size,
+            "modified": stat.st_mtime,
+            "created": stat.st_ctime,
+            "extension": p.suffix,
+        }
+    except Exception as exc:
+        await ctx.error(f"file_info failed: {type(exc).__name__}: {exc}")
+        return unexpected_error("file_info", path, exc)
 
 
 # tree - show me the project structure
 @mcp.tool()
-def tree(path: str = DEFAULT_PATH, max_depth: int = 3) -> str:
+async def tree(ctx: Context, path: str = DEFAULT_PATH, max_depth: int = 3) -> str:
     """Show a recursive directory tree up to max_depth levels."""
-    p = Path(path)
-    if not p.exists():
-        return f"Error: {path} does not exist"
+    try:
+        p = Path(path)
+        if not p.exists():
+            await ctx.error(f"tree failed: {path} does not exist")
+            return path_error("tree", path)
 
-    lines: list[str] = []
+        await ctx.info(f"Building directory tree for: {path} (max_depth={max_depth})")
+        lines: list[str] = []
 
-    def _walk(dir_path: Path, prefix: str, depth: int) -> None:
-        if depth >= max_depth:
-            return
-        children = sorted(dir_path.iterdir())
-        for i, child in enumerate(children):
-            connector = "└── " if i == len(children) - 1 else "├── "
-            icon = "📁 " if child.is_dir() else "📄 "
-            lines.append(f"{prefix}{connector}{icon}{child.name}")
-            if child.is_dir():
-                extension = "    " if i == len(children) - 1 else "│   "
-                _walk(child, prefix + extension, depth + 1)
+        def _walk(dir_path: Path, prefix: str, depth: int) -> None:
+            if depth >= max_depth:
+                return
+            children = sorted(dir_path.iterdir())
+            for i, child in enumerate(children):
+                connector = "└── " if i == len(children) - 1 else "├── "
+                icon = "📁 " if child.is_dir() else "📄 "
+                lines.append(f"{prefix}{connector}{icon}{child.name}")
+                if child.is_dir():
+                    extension = "    " if i == len(children) - 1 else "│   "
+                    _walk(child, prefix + extension, depth + 1)
 
-    lines.append(f"📁 {p.name}/")
-    _walk(p, "", 0)
-    return "\n".join(lines)
+        lines.append(f"📁 {p.name}/")
+        _walk(p, "", 0)
+        return "\n".join(lines)
+    except Exception as exc:
+        await ctx.error(f"tree failed: {type(exc).__name__}: {exc}")
+        return unexpected_error("tree", path, exc)
