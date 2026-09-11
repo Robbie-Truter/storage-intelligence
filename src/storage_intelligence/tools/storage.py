@@ -18,7 +18,7 @@ from pathlib import Path
 # Home directory for the user
 DEFAULT_PATH = str(Path.home())
 
-# list_directory - what's in this folder?
+# 1. list_directory - what's in this folder?
 @mcp.tool()
 async def list_directory(ctx: Context, path: str = DEFAULT_PATH) -> str:
     """List the contents of a directory with type indicators."""
@@ -37,7 +37,7 @@ async def list_directory(ctx: Context, path: str = DEFAULT_PATH) -> str:
         await ctx.error(f"list_directory failed: {type(exc).__name__}: {exc}")
         return unexpected_error("list_directory", path, exc)
 
-# count_files - how many files of each type are in this folder?
+# 2. count_files - how many files of each type are in this folder?
 @mcp.tool()
 async def count_files(ctx: Context, path: str = DEFAULT_PATH) -> dict:
     """Count files and directories in a directory, broken down by type."""
@@ -60,7 +60,7 @@ async def count_files(ctx: Context, path: str = DEFAULT_PATH) -> dict:
         return unexpected_error("count_files", path, exc)
 
 
-# file_names - show me all files with a given extension here
+# 3. file_names - show me all files with a given extension here
 @mcp.tool()
 async def file_names(ctx: Context, path: str = DEFAULT_PATH, extension: str = "") -> list[str]:
     """List file names in a directory, optionally filtered by extension (e.g. '.py')."""
@@ -78,7 +78,7 @@ async def file_names(ctx: Context, path: str = DEFAULT_PATH, extension: str = ""
         return unexpected_error("file_names", path, exc)
 
 
-# directory_sizes - what's taking up space?
+# 4. directory_sizes - what's taking up space?
 @mcp.tool()
 async def directory_sizes(ctx: Context, path: str = DEFAULT_PATH) -> list[dict]:
     """List top-level items in a directory with their sizes in human-readable format."""
@@ -109,7 +109,7 @@ async def directory_sizes(ctx: Context, path: str = DEFAULT_PATH) -> list[dict]:
         return unexpected_error("directory_sizes", path, exc)
 
 
-# search_files - find all files matching a glob pattern
+# 5. search_files - find all files matching a glob pattern
 @mcp.tool()
 async def search_files(ctx: Context, path: str = DEFAULT_PATH, pattern: str = "*") -> list[str]:
     """Search for files matching a glob pattern (e.g. '*.py', '**/*.txt')."""
@@ -125,7 +125,7 @@ async def search_files(ctx: Context, path: str = DEFAULT_PATH, pattern: str = "*
         return unexpected_error("search_files", path, exc)
 
 
-# file_info - when was this file last modified?
+# 6. file_info - when was this file last modified?
 @mcp.tool()
 async def file_info(ctx: Context, path: str = DEFAULT_PATH) -> dict:
     """Get metadata about a file: size, created/modified times, type."""
@@ -150,7 +150,7 @@ async def file_info(ctx: Context, path: str = DEFAULT_PATH) -> dict:
         return unexpected_error("file_info", path, exc)
 
 
-# tree - show me the project structure
+# 7. tree - show me the project structure
 @mcp.tool()
 async def tree(ctx: Context, path: str = DEFAULT_PATH, max_depth: int = 3) -> str:
     """Show a recursive directory tree up to max_depth levels."""
