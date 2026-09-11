@@ -1,7 +1,9 @@
+from pathlib import Path
+
 from fastmcp import Context
+
 from storage_intelligence.core import mcp
 from storage_intelligence.utils import path_error, unexpected_error
-from pathlib import Path
 
 # ===============================================
 # List of storage analysis tools, in the order they are implemented:
@@ -17,6 +19,7 @@ from pathlib import Path
 
 # Home directory for the user
 DEFAULT_PATH = str(Path.home())
+
 
 # 1. list_directory - what's in this folder?
 @mcp.tool()
@@ -37,6 +40,7 @@ async def list_directory(ctx: Context, path: str = DEFAULT_PATH) -> str:
         await ctx.error(f"list_directory failed: {type(exc).__name__}: {exc}")
         return unexpected_error("list_directory", path, exc)
 
+
 # 2. count_files - how many files of each type are in this folder?
 @mcp.tool()
 async def count_files(ctx: Context, path: str = DEFAULT_PATH) -> dict:
@@ -54,7 +58,10 @@ async def count_files(ctx: Context, path: str = DEFAULT_PATH) -> dict:
                 total += 1
                 ext = child.suffix.lower() or "(no extension)"
                 by_extension[ext] = by_extension.get(ext, 0) + 1
-        return {"total_files": total, "by_extension": dict(sorted(by_extension.items(), key=lambda x: -x[1]))}
+        return {
+            "total_files": total,
+            "by_extension": dict(sorted(by_extension.items(), key=lambda x: -x[1])),
+        }
     except Exception as exc:
         await ctx.error(f"count_files failed: {type(exc).__name__}: {exc}")
         return unexpected_error("count_files", path, exc)
@@ -62,16 +69,25 @@ async def count_files(ctx: Context, path: str = DEFAULT_PATH) -> dict:
 
 # 3. file_names - show me all files with a given extension here
 @mcp.tool()
-async def file_names(ctx: Context, path: str = DEFAULT_PATH, extension: str = "") -> list[str]:
+async def file_names(
+    ctx: Context, path: str = DEFAULT_PATH, extension: str = ""
+) -> list[str]:
     """List file names in a directory, optionally filtered by extension (e.g. '.py')."""
     try:
         p = Path(path)
         if not p.exists():
             await ctx.error(f"file_names failed: {path} does not exist")
             return path_error("file_names", path)
-        await ctx.info(f"Listing file names in: {path}" + (f" (extension={extension})" if extension else ""))
+        await ctx.info(
+            f"Listing file names in: {path}"
+            + (f" (extension={extension})" if extension else "")
+        )
         if extension:
-            return [f.name for f in p.iterdir() if f.is_file() and f.suffix.lower() == extension.lower()]
+            return [
+                f.name
+                for f in p.iterdir()
+                if f.is_file() and f.suffix.lower() == extension.lower()
+            ]
         return [f.name for f in p.iterdir() if f.is_file()]
     except Exception as exc:
         await ctx.error(f"file_names failed: {type(exc).__name__}: {exc}")
@@ -99,10 +115,18 @@ async def directory_sizes(ctx: Context, path: str = DEFAULT_PATH) -> list[dict]:
         results = []
         for child in sorted(p.iterdir()):
             if child.is_file():
-                results.append({"name": child.name, "type": "file", "size": human_size(child.stat().st_size)})
+                results.append(
+                    {
+                        "name": child.name,
+                        "type": "file",
+                        "size": human_size(child.stat().st_size),
+                    }
+                )
             else:
                 file_count = sum(1 for _ in child.rglob("*") if _.is_file())
-                results.append({"name": child.name, "type": "directory", "files": file_count})
+                results.append(
+                    {"name": child.name, "type": "directory", "files": file_count}
+                )
         return results
     except Exception as exc:
         await ctx.error(f"directory_sizes failed: {type(exc).__name__}: {exc}")
@@ -111,7 +135,9 @@ async def directory_sizes(ctx: Context, path: str = DEFAULT_PATH) -> list[dict]:
 
 # 5. search_files - find all files matching a glob pattern
 @mcp.tool()
-async def search_files(ctx: Context, path: str = DEFAULT_PATH, pattern: str = "*") -> list[str]:
+async def search_files(
+    ctx: Context, path: str = DEFAULT_PATH, pattern: str = "*"
+) -> list[str]:
     """Search for files matching a glob pattern (e.g. '*.py', '**/*.txt')."""
     try:
         p = Path(path)

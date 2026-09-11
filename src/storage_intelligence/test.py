@@ -16,5 +16,7 @@ def print_tree(path: Path, indent: int = 0) -> None:
             print(f"{prefix}{item.name}")
 
 
-print_tree(example_path)
+test_path = "/Users/roberttruter/personal_projects/storage-intelligence/src/storage_intelligence"
+p = Path(test_path)
 
+print(test_path)
