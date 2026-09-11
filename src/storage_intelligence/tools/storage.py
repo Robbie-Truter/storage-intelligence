@@ -13,9 +13,12 @@ from pathlib import Path
 # 7. tree - show me the project structure
 # ===============================================
 
+# Home directory for the user
+DEFAULT_PATH = str(Path.home())
+
 # list_directory - what's in this folder?
 @mcp.tool()
-def list_directory(path: str) -> str:
+def list_directory(path: str = DEFAULT_PATH) -> str:
     """List the contents of a directory with type indicators."""
     p = Path(path)
     if not p.exists():
@@ -28,7 +31,7 @@ def list_directory(path: str) -> str:
 
 # count_files - how many files of each type are in this folder?
 @mcp.tool()
-def count_files(path: str) -> dict:
+def count_files(path: str = DEFAULT_PATH) -> dict:
     """Count files and directories in a directory, broken down by type."""
     p = Path(path)
     if not p.exists():
@@ -45,7 +48,7 @@ def count_files(path: str) -> dict:
 
 # file_names - show me all files with a given extension here
 @mcp.tool()
-def file_names(path: str, extension: str = "") -> list[str]:
+def file_names(path: str = DEFAULT_PATH, extension: str = "") -> list[str]:
     """List file names in a directory, optionally filtered by extension (e.g. '.py')."""
     p = Path(path)
     if not p.exists():
@@ -57,7 +60,7 @@ def file_names(path: str, extension: str = "") -> list[str]:
 
 # directory_sizes - what's taking up space?
 @mcp.tool()
-def directory_sizes(path: str) -> list[dict]:
+def directory_sizes(path: str = DEFAULT_PATH) -> list[dict]:
     """List top-level items in a directory with their sizes in human-readable format."""
     p = Path(path)
     if not p.exists():
@@ -82,7 +85,7 @@ def directory_sizes(path: str) -> list[dict]:
 
 # search_files - find all files matching a glob pattern
 @mcp.tool()
-def search_files(path: str, pattern: str) -> list[str]:
+def search_files(path: str = DEFAULT_PATH, pattern: str = "*") -> list[str]:
     """Search for files matching a glob pattern (e.g. '*.py', '**/*.txt')."""
     p = Path(path)
     if not p.exists():
@@ -92,7 +95,7 @@ def search_files(path: str, pattern: str) -> list[str]:
 
 # file_info - when was this file last modified?
 @mcp.tool()
-def file_info(path: str) -> dict:
+def file_info(path: str = DEFAULT_PATH) -> dict:
     """Get metadata about a file: size, created/modified times, type."""
     p = Path(path)
     if not p.exists():
@@ -111,7 +114,7 @@ def file_info(path: str) -> dict:
 
 # tree - show me the project structure
 @mcp.tool()
-def tree(path: str, max_depth: int = 3) -> str:
+def tree(path: str = DEFAULT_PATH, max_depth: int = 3) -> str:
     """Show a recursive directory tree up to max_depth levels."""
     p = Path(path)
     if not p.exists():
