@@ -1,4 +1,6 @@
+import shutil
 from pathlib import Path
+import hashlib
 
 from fastmcp import Context
 
@@ -15,6 +17,10 @@ from storage_intelligence.utils import path_error, unexpected_error
 # 5. search_files - find all files matching a pattern
 # 6. file_info - when was this file last modified?
 # 7. tree - show me the project structure
+# 8. get_disk_usage - how much space is left on this volume?
+# 9. directory_disk_usage - which subdirectories consume the most space?
+# 10. find_large_files - which files are bigger than a threshold?
+# 11. find_duplicate_files - are there identical files lurking around?
 # ===============================================
 
 # Home directory for the user
@@ -207,3 +213,77 @@ async def tree(ctx: Context, path: str = DEFAULT_PATH, max_depth: int = 3) -> st
     except Exception as exc:
         await ctx.error(f"tree failed: {type(exc).__name__}: {exc}")
         return unexpected_error("tree", path, exc)
+
+
+# 8. get_disk_usage - how much space is left on this volume?
+@mcp.tool()
+async def get_disk_usage(ctx: Context, path: str = DEFAULT_PATH) -> dict:
+    """Get total, used, and free disk space for the volume containing path."""
+    try:
+        p = Path(path)
+        if not p.exists():
+            await ctx.error(f"get_disk_usage failed: {path} does not exist")
+            return path_error("get_disk_usage", path)
+        await ctx.info(f"Getting disk usage for: {path}")
+        total, used, free = shutil.disk_usage(p)
+        usage_percent = round(used / total * 100, 1) if total else 0.0
+        return {
+            "path": str(p),
+            "total_bytes": total,
+            "used_bytes": used,
+            "free_bytes": free,
+            "usage_percent": usage_percent,
+        }
+    except Exception as exc:
+        await ctx.error(f"get_disk_usage failed: {type(exc).__name__}: {exc}")
+        return unexpected_error("get_disk_usage", path, exc)
+
+
+# 9. directory_disk_usage - which subdirectories consume the most space?
+@mcp.tool()
+async def directory_disk_usage(
+    ctx: Context, path: str = DEFAULT_PATH, top_n: int = 10
+) -> list[dict]:
+    """Calculate top items in path sorted by actual disk space consumed (bytes)."""
+    try:
+        p = Path(path)
+        if not p.exists():
+            await ctx.error(f"directory_disk_usage failed: {path} does not exist")
+            return path_error("directory_disk_usage", path)
+
+        def dir_size(d: Path) -> int:
+            total = 0
+            for child in d.rglob("*"):
+                if child.is_file():
+                    try:
+                        total += child.stat().st_size
+                    except OSError:
+                        continue
+            return total
+
+        await ctx.info(f"Computing recursive disk usage in: {path} (top_n={top_n})")
+        results = []
+        for child in sorted(p.iterdir()):
+            if child.is_file():
+                results.append(
+                    {
+                        "name": child.name,
+                        "type": "file",
+                        "size_bytes": child.stat().st_size,
+                    }
+                )
+            else:
+                results.append(
+                    {
+                        "name": child.name,
+                        "type": "directory",
+                        "size_bytes": dir_size(child),
+                    }
+                )
+        results.sort(key=lambda x: x["size_bytes"], reverse=True)
+        return results[:top_n]
+    except Exception as exc:
+        await ctx.error(f"directory_disk_usage failed: {type(exc).__name__}: {exc}")
+        return unexpected_error("directory_disk_usage", path, exc)
+
+
