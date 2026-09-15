@@ -286,4 +286,42 @@ async def directory_disk_usage(
         await ctx.error(f"directory_disk_usage failed: {type(exc).__name__}: {exc}")
         return unexpected_error("directory_disk_usage", path, exc)
 
-
+# 10. find_large_files - which files are bigger than a threshold?
+@mcp.tool()
+async def find_large_files(
+    ctx: Context,
+    path: str = DEFAULT_PATH,
+    min_size_mb: float = 100.0,
+    max_results: int = 50,
+) -> list[dict]:
+    """Find all files in path larger than min_size_mb."""
+    try:
+        p = Path(path)
+        if not p.exists():
+            await ctx.error(f"find_large_files failed: {path} does not exist")
+            return path_error("find_large_files", path)
+        await ctx.info(
+            f"Searching for files > {min_size_mb} MB in: {path} (max_results={max_results})"
+        )
+        min_bytes = min_size_mb * 1024 * 1024
+        results = []
+        for child in p.rglob("*"):
+            if not child.is_file():
+                continue
+            try:
+                size = child.stat().st_size
+            except OSError:
+                continue
+            if size >= min_bytes:
+                results.append(
+                    {
+                        "path": str(child),
+                        "size_bytes": size,
+                        "size_mb": round(size / (1024 * 1024), 1),
+                    }
+                )
+        results.sort(key=lambda x: x["size_bytes"], reverse=True)
+        return results[:max_results]
+    except Exception as exc:
+        await ctx.error(f"find_large_files failed: {type(exc).__name__}: {exc}")
+        return unexpected_error("find_large_files", path, exc)
