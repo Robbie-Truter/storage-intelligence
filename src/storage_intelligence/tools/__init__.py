@@ -1,1 +1,1 @@
-from storage_intelligence.tools.example import *
+from storage_intelligence.tools.storage import *
