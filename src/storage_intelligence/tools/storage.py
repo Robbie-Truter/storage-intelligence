@@ -1,5 +1,6 @@
 import hashlib
 import shutil
+import time
 from pathlib import Path
 
 from fastmcp import Context
@@ -329,7 +330,6 @@ async def find_large_files(
         await ctx.error(f"find_large_files failed: {type(exc).__name__}: {exc}")
         return unexpected_error("find_large_files", path, exc)
 
-
 # 11. find_duplicate_files - are there identical files lurking around?
 @mcp.tool()
 async def find_duplicate_files(
@@ -382,3 +382,49 @@ async def find_duplicate_files(
     except Exception as exc:
         await ctx.error(f"find_duplicate_files failed: {type(exc).__name__}: {exc}")
         return unexpected_error("find_duplicate_files", path, exc)
+
+
+# 12. find_stale_files - which files haven't been modified in a while?
+@mcp.tool()
+async def find_stale_files(
+    ctx: Context, path: str = DEFAULT_PATH, days_unmodified: int = 90, max_results: int = 100,
+
+) -> list[dict]:
+    """Find files that have not been modified for more than days_unmodified."""
+    try:
+        p = Path(path)
+        if not p.exists():
+            await ctx.error(f"find_stale_files failed: {path} does not exist")
+            return path_error("find_stale_files", path)
+        await ctx.info(
+            f"Scanning for stale files in: {path} (days_unmodified={days_unmodified})"
+        )
+
+        now = time.time()
+        threshold_seconds = days_unmodified * 86400
+        stale_files = []
+
+        for child in p.rglob("*"):
+            if not child.is_file():
+                continue
+            try:
+                stat_result = child.stat()
+                mtime = stat_result.st_mtime
+                age_seconds = now - mtime
+                if age_seconds > threshold_seconds:
+                    stale_files.append(
+                        {
+                            "path": str(child),
+                            "size_bytes": stat_result.st_size,
+                            "days_unmodified": round(age_seconds / 86400, 1),
+                        }
+                    )
+            except OSError:
+                continue
+
+        stale_files.sort(key=lambda x: x["days_unmodified"], reverse=True)
+        return stale_files[:max_results]
+    except Exception as exc:
+        await ctx.error(f"find_stale_files failed: {type(exc).__name__}: {exc}")
+        return unexpected_error("find_stale_files", path, exc)
+
