@@ -6,6 +6,7 @@ home_dir = Path.home()
 # Define a specific path
 example_path = home_dir / "Documents"
 
+
 def print_tree(path: Path, indent: int = 0) -> None:
     prefix = "  " * indent
     for item in path.iterdir():
@@ -16,7 +17,11 @@ def print_tree(path: Path, indent: int = 0) -> None:
             print(f"{prefix}{item.name}")
 
 
-test_path = "/Users/roberttruter/personal_projects/storage-intelligence/src/storage_intelligence"
+test_path = (
+    "/Users/roberttruter/personal_projects/"
+    "storage-intelligence/src/storage_intelligence"
+)
+
 p = Path(test_path)
 
 print(test_path)
