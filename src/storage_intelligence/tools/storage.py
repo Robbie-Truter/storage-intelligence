@@ -330,6 +330,7 @@ async def find_large_files(
         await ctx.error(f"find_large_files failed: {type(exc).__name__}: {exc}")
         return unexpected_error("find_large_files", path, exc)
 
+
 # 11. find_duplicate_files - are there identical files lurking around?
 @mcp.tool()
 async def find_duplicate_files(
@@ -387,8 +388,10 @@ async def find_duplicate_files(
 # 12. find_stale_files - which files haven't been modified in a while?
 @mcp.tool()
 async def find_stale_files(
-    ctx: Context, path: str = DEFAULT_PATH, days_unmodified: int = 90, max_results: int = 100,
-
+    ctx: Context,
+    path: str = DEFAULT_PATH,
+    days_unmodified: int = 90,
+    max_results: int = 100,
 ) -> list[dict]:
     """Find files that have not been modified for more than days_unmodified."""
     try:
@@ -427,4 +430,3 @@ async def find_stale_files(
     except Exception as exc:
         await ctx.error(f"find_stale_files failed: {type(exc).__name__}: {exc}")
         return unexpected_error("find_stale_files", path, exc)
-
