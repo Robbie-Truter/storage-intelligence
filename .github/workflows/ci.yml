@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+# Cancel outdated workflow runs on open PR updates
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: Lint, Format & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv & Python
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Ruff Lint Check
+        run: uv run ruff check . --output-format=github
+
+      - name: Ruff Format Check
+        run: uv run ruff format --check .
+
+      - name: Build Package
+        run: uv build
+
+      - name: Test Server Import
+        run: uv run python -c "from storage_intelligence.server import mcp; print('Server loads OK')"
