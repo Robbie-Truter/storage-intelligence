@@ -1,6 +1,6 @@
+import hashlib
 import shutil
 from pathlib import Path
-import hashlib
 
 from fastmcp import Context
 
@@ -21,6 +21,7 @@ from storage_intelligence.utils import path_error, unexpected_error
 # 9. directory_disk_usage - which subdirectories consume the most space?
 # 10. find_large_files - which files are bigger than a threshold?
 # 11. find_duplicate_files - are there identical files lurking around?
+# 12. find_stale_files - which files haven't been accessed in a while?
 # ===============================================
 
 # Home directory for the user
@@ -286,6 +287,7 @@ async def directory_disk_usage(
         await ctx.error(f"directory_disk_usage failed: {type(exc).__name__}: {exc}")
         return unexpected_error("directory_disk_usage", path, exc)
 
+
 # 10. find_large_files - which files are bigger than a threshold?
 @mcp.tool()
 async def find_large_files(
@@ -301,7 +303,8 @@ async def find_large_files(
             await ctx.error(f"find_large_files failed: {path} does not exist")
             return path_error("find_large_files", path)
         await ctx.info(
-            f"Searching for files > {min_size_mb} MB in: {path} (max_results={max_results})"
+            f"Searching for files > {min_size_mb} MB in: {path} "
+            f"(max_results={max_results})"
         )
         min_bytes = min_size_mb * 1024 * 1024
         results = []
@@ -325,3 +328,57 @@ async def find_large_files(
     except Exception as exc:
         await ctx.error(f"find_large_files failed: {type(exc).__name__}: {exc}")
         return unexpected_error("find_large_files", path, exc)
+
+
+# 11. find_duplicate_files - are there identical files lurking around?
+@mcp.tool()
+async def find_duplicate_files(
+    ctx: Context, path: str = DEFAULT_PATH, min_size_bytes: int = 1024
+) -> list[dict]:
+    """Find candidate duplicate files grouped by content hash."""
+    try:
+        p = Path(path)
+        if not p.exists():
+            await ctx.error(f"find_duplicate_files failed: {path} does not exist")
+            return path_error("find_duplicate_files", path)
+        await ctx.info(
+            f"Scanning for duplicates in: {path} (min_size_bytes={min_size_bytes})"
+        )
+
+        def file_hash(fp: Path, chunk_size: int = 65536) -> str:
+            h = hashlib.sha256()
+            with fp.open("rb") as f:
+                while chunk := f.read(chunk_size):
+                    h.update(chunk)
+            return h.hexdigest()
+
+        by_size: dict[int, list[Path]] = {}
+        for child in p.rglob("*"):
+            if not child.is_file():
+                continue
+            try:
+                size = child.stat().st_size
+            except OSError:
+                continue
+            if size >= min_size_bytes:
+                by_size.setdefault(size, []).append(child)
+
+        groups: dict[tuple[int, str], list[str]] = {}
+        for size, files in by_size.items():
+            if len(files) < 2:
+                continue
+            for fp in files:
+                try:
+                    digest = file_hash(fp)
+                except OSError:
+                    continue
+                groups.setdefault((size, digest), []).append(str(fp))
+
+        return [
+            {"size_bytes": size, "files": paths}
+            for (size, _digest), paths in sorted(groups.items(), key=lambda x: -x[0][0])
+            if len(paths) > 1
+        ]
+    except Exception as exc:
+        await ctx.error(f"find_duplicate_files failed: {type(exc).__name__}: {exc}")
+        return unexpected_error("find_duplicate_files", path, exc)
