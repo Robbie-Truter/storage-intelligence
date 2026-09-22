@@ -21,7 +21,9 @@ DEFAULT_PATH = str(Path.home())
 
 # 1. delete_file - delete a specific file safely
 @mcp.tool()
-async def delete_file(ctx: Context, path: str) -> str:
+async def delete_file(
+    ctx: Context, path: str, dry_run: bool = True, confirm: bool = False
+) -> str | dict:
     """Delete a single file at the specified path."""
     # TODO: Implement safety checks (dry-run, confirmations) and file removal logic.
     pass
@@ -30,7 +32,11 @@ async def delete_file(ctx: Context, path: str) -> str:
 # 2. delete_empty_directories - find and remove empty folders in a path
 @mcp.tool()
 async def delete_empty_directories(
-    ctx: Context, path: str = DEFAULT_PATH, recursive: bool = True
+    ctx: Context,
+    path: str = DEFAULT_PATH,
+    recursive: bool = True,
+    dry_run: bool = True,
+    confirm: bool = False,
 ) -> dict:
     """Recursively search for and remove empty directories within a path."""
     # TODO: Implement directory tree traversal and empty directory cleanup logic.
@@ -44,6 +50,7 @@ async def clean_temp_files(
     path: str = DEFAULT_PATH,
     patterns: list[str] | None = None,
     dry_run: bool = True,
+    confirm: bool = False,
 ) -> dict:
     """Search for and delete temporary files matching specified glob patterns."""
     # TODO: Implement pattern matching for temp files and safe deletion/dry-run options.
@@ -53,7 +60,10 @@ async def clean_temp_files(
 # 4. remove_duplicate_files - remove duplicate files keeping one original copy
 @mcp.tool()
 async def remove_duplicate_files(
-    ctx: Context, path: str = DEFAULT_PATH, dry_run: bool = True
+    ctx: Context,
+    path: str = DEFAULT_PATH,
+    dry_run: bool = True,
+    confirm: bool = False,
 ) -> dict:
     """Identify duplicate files by hash and remove redundant copies."""
     # TODO: Implement hash comparison to detect duplicates and delete redundant copies safely.
@@ -68,6 +78,7 @@ async def archive_stale_files(
     days_unmodified: int = 90,
     destination_archive: str = "",
     dry_run: bool = True,
+    confirm: bool = False,
 ) -> dict:
     """Archive files that have not been modified within the specified threshold."""
     # TODO: Implement stale file scanning and moving/compressing logic to an archive destination.
@@ -77,7 +88,10 @@ async def archive_stale_files(
 # 6. clean_cache_directories - clear cache directories (__pycache__, .cache, etc.)
 @mcp.tool()
 async def clean_cache_directories(
-    ctx: Context, path: str = DEFAULT_PATH, dry_run: bool = True
+    ctx: Context,
+    path: str = DEFAULT_PATH,
+    dry_run: bool = True,
+    confirm: bool = False,
 ) -> dict:
     """Find and clear standard system/application cache directories."""
     # TODO: Implement directory pattern matching for known cache folders and removal logic.
