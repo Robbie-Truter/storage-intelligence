@@ -2,6 +2,8 @@ from pathlib import Path
 
 from fastmcp import Context
 
+from mcp.types import ToolAnnotations
+
 from storage_intelligence.core import mcp
 from storage_intelligence.utils import path_error, unexpected_error
 
@@ -16,11 +18,14 @@ from storage_intelligence.utils import path_error, unexpected_error
 # 6. clean_cache_directories - clear cache directories (__pycache__, .cache, etc.)
 # ===============================================
 
+# Destructive annotation hint because cleanup tools modify or delete files
+DESTRUCTIVE = ToolAnnotations(readOnlyHint=False, destructiveHint=True)
+
+# Home directory for the user
 DEFAULT_PATH = str(Path.home())
 
-
 # 1. delete_file - delete a specific file safely
-@mcp.tool()
+@mcp.tool(annotations=DESTRUCTIVE)
 async def delete_file(
     ctx: Context, path: str, dry_run: bool = True, confirm: bool = False
 ) -> str | dict:
@@ -30,7 +35,7 @@ async def delete_file(
 
 
 # 2. delete_empty_directories - find and remove empty folders in a path
-@mcp.tool()
+@mcp.tool(annotations=DESTRUCTIVE)
 async def delete_empty_directories(
     ctx: Context,
     path: str = DEFAULT_PATH,
@@ -44,7 +49,7 @@ async def delete_empty_directories(
 
 
 # 3. clean_temp_files - remove temporary files (.tmp, .bak, ~*, etc.)
-@mcp.tool()
+@mcp.tool(annotations=DESTRUCTIVE)
 async def clean_temp_files(
     ctx: Context,
     path: str = DEFAULT_PATH,
@@ -58,7 +63,7 @@ async def clean_temp_files(
 
 
 # 4. remove_duplicate_files - remove duplicate files keeping one original copy
-@mcp.tool()
+@mcp.tool(annotations=DESTRUCTIVE)
 async def remove_duplicate_files(
     ctx: Context,
     path: str = DEFAULT_PATH,
@@ -71,7 +76,7 @@ async def remove_duplicate_files(
 
 
 # 5. archive_stale_files - move or compress files unmodified for X days
-@mcp.tool()
+@mcp.tool(annotations=DESTRUCTIVE)
 async def archive_stale_files(
     ctx: Context,
     path: str = DEFAULT_PATH,
@@ -86,7 +91,7 @@ async def archive_stale_files(
 
 
 # 6. clean_cache_directories - clear cache directories (__pycache__, .cache, etc.)
-@mcp.tool()
+@mcp.tool(annotations=DESTRUCTIVE)
 async def clean_cache_directories(
     ctx: Context,
     path: str = DEFAULT_PATH,

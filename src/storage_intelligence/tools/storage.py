@@ -5,6 +5,8 @@ from pathlib import Path
 
 from fastmcp import Context
 
+from mcp.types import ToolAnnotations
+
 from storage_intelligence.core import mcp
 from storage_intelligence.utils import path_error, unexpected_error
 
@@ -25,12 +27,15 @@ from storage_intelligence.utils import path_error, unexpected_error
 # 12. find_stale_files - which files haven't been accessed in a while?
 # ===============================================
 
+# Read only annotation hint, because these tools do not modify the file system
+READ_ONLY = ToolAnnotations(readOnlyHint=True)
+
 # Home directory for the user
 DEFAULT_PATH = str(Path.home())
 
 
 # 1. list_directory - what's in this folder?
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def list_directory(ctx: Context, path: str = DEFAULT_PATH) -> str:
     """List the contents of a directory with type indicators."""
     try:
@@ -50,7 +55,7 @@ async def list_directory(ctx: Context, path: str = DEFAULT_PATH) -> str:
 
 
 # 2. count_files - how many files of each type are in this folder?
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def count_files(ctx: Context, path: str = DEFAULT_PATH) -> dict:
     """Count files and directories in a directory, broken down by type."""
     try:
@@ -76,7 +81,7 @@ async def count_files(ctx: Context, path: str = DEFAULT_PATH) -> dict:
 
 
 # 3. file_names - show me all files with a given extension here
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def file_names(
     ctx: Context, path: str = DEFAULT_PATH, extension: str = ""
 ) -> list[str]:
@@ -103,7 +108,7 @@ async def file_names(
 
 
 # 4. directory_sizes - what's taking up space?
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def directory_sizes(ctx: Context, path: str = DEFAULT_PATH) -> list[dict]:
     """List top-level items in a directory with their sizes in human-readable format."""
     try:
@@ -142,7 +147,7 @@ async def directory_sizes(ctx: Context, path: str = DEFAULT_PATH) -> list[dict]:
 
 
 # 5. search_files - find all files matching a glob pattern
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def search_files(
     ctx: Context, path: str = DEFAULT_PATH, pattern: str = "*"
 ) -> list[str]:
@@ -160,7 +165,7 @@ async def search_files(
 
 
 # 6. file_info - when was this file last modified?
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def file_info(ctx: Context, path: str = DEFAULT_PATH) -> dict:
     """Get metadata about a file: size, created/modified times, type."""
     try:
@@ -185,7 +190,7 @@ async def file_info(ctx: Context, path: str = DEFAULT_PATH) -> dict:
 
 
 # 7. tree - show me the project structure
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def tree(ctx: Context, path: str = DEFAULT_PATH, max_depth: int = 3) -> str:
     """Show a recursive directory tree up to max_depth levels."""
     try:
@@ -218,7 +223,7 @@ async def tree(ctx: Context, path: str = DEFAULT_PATH, max_depth: int = 3) -> st
 
 
 # 8. get_disk_usage - how much space is left on this volume?
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def get_disk_usage(ctx: Context, path: str = DEFAULT_PATH) -> dict:
     """Get total, used, and free disk space for the volume containing path."""
     try:
@@ -242,7 +247,7 @@ async def get_disk_usage(ctx: Context, path: str = DEFAULT_PATH) -> dict:
 
 
 # 9. directory_disk_usage - which subdirectories consume the most space?
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def directory_disk_usage(
     ctx: Context, path: str = DEFAULT_PATH, top_n: int = 10
 ) -> list[dict]:
@@ -290,7 +295,7 @@ async def directory_disk_usage(
 
 
 # 10. find_large_files - which files are bigger than a threshold?
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def find_large_files(
     ctx: Context,
     path: str = DEFAULT_PATH,
@@ -332,7 +337,7 @@ async def find_large_files(
 
 
 # 11. find_duplicate_files - are there identical files lurking around?
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def find_duplicate_files(
     ctx: Context, path: str = DEFAULT_PATH, min_size_bytes: int = 1024
 ) -> list[dict]:
@@ -386,7 +391,7 @@ async def find_duplicate_files(
 
 
 # 12. find_stale_files - which files haven't been modified in a while?
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def find_stale_files(
     ctx: Context,
     path: str = DEFAULT_PATH,
