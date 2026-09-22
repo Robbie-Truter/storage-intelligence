@@ -1,7 +1,7 @@
 [project]
 name = "storage-intelligence"
 version = "0.1.0"
-description = "Add your description here"
+description = "Intelligent local storage analysis, disk usage profiling, duplicate file detection, and automated safe cleanup workflows."
 readme = "README.md"
 authors = [
     { name = "Robbie-Truter", email = "timothylang6@gmail.com" }
