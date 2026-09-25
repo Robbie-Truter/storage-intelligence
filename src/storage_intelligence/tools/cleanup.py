@@ -1,8 +1,8 @@
 from pathlib import Path
 
 from fastmcp import Context
-
 from mcp.types import ToolAnnotations
+from send2trash import send2trash
 
 from storage_intelligence.core import mcp
 from storage_intelligence.utils import path_error, unexpected_error
@@ -24,14 +24,28 @@ DESTRUCTIVE = ToolAnnotations(readOnlyHint=False, destructiveHint=True)
 # Home directory for the user
 DEFAULT_PATH = str(Path.home())
 
+
 # 1. delete_file - delete a specific file safely
 @mcp.tool(annotations=DESTRUCTIVE)
 async def delete_file(
     ctx: Context, path: str, dry_run: bool = True, confirm: bool = False
 ) -> str | dict:
     """Delete a single file at the specified path."""
-    # TODO: Implement safety checks (dry-run, confirmations) and file removal logic.
-    pass
+    try:
+        p = Path(path)
+        if not p.exists():
+            await ctx.error(f"list_directory failed: {path} does not exist")
+            return path_error("list_directory", path)
+        if dry_run:
+            return f"Dry run: Would delete '{path}'"
+        if not confirm:
+            return f"Dry run: Would delete '{path}'. Use confirm=True to delete."
+        send2trash(str(p))
+        await ctx.info(f"Deleted file: {path}")
+        return f"Deleted file: {path}"
+    except Exception as exc:
+        await ctx.error(f"delete_file failed: {type(exc).__name__}: {exc}")
+        return unexpected_error("delete_file", path, exc)
 
 
 # 2. delete_empty_directories - find and remove empty folders in a path
@@ -71,7 +85,8 @@ async def remove_duplicate_files(
     confirm: bool = False,
 ) -> dict:
     """Identify duplicate files by hash and remove redundant copies."""
-    # TODO: Implement hash comparison to detect duplicates and delete redundant copies safely.
+    # TODO: Implement hash comparison to detect duplicates and delete
+    # redundant copies safely.
     pass
 
 
@@ -86,7 +101,8 @@ async def archive_stale_files(
     confirm: bool = False,
 ) -> dict:
     """Archive files that have not been modified within the specified threshold."""
-    # TODO: Implement stale file scanning and moving/compressing logic to an archive destination.
+    # TODO: Implement stale file scanning and moving/compressing logic to
+    # an archive destination.
     pass
 
 
@@ -99,5 +115,6 @@ async def clean_cache_directories(
     confirm: bool = False,
 ) -> dict:
     """Find and clear standard system/application cache directories."""
-    # TODO: Implement directory pattern matching for known cache folders and removal logic.
+    # TODO: Implement directory pattern matching for known cache folders
+    # and removal logic.
     pass
