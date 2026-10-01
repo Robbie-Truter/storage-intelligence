@@ -5,7 +5,11 @@ from mcp.types import ToolAnnotations
 from send2trash import send2trash
 
 from storage_intelligence.core import mcp
-from storage_intelligence.utils import path_error, unexpected_error
+from storage_intelligence.utils import (
+    EmptyDirectoriesResult,
+    path_error,
+    unexpected_error,
+)
 
 # ===============================================
 # List of storage cleanup tools, in the order they are implemented:
@@ -54,12 +58,120 @@ async def delete_empty_directories(
     ctx: Context,
     path: str = DEFAULT_PATH,
     recursive: bool = True,
-    dry_run: bool = True,
     confirm: bool = False,
-) -> dict:
-    """Recursively search for and remove empty directories within a path."""
-    # TODO: Implement directory tree traversal and empty directory cleanup logic.
-    pass
+) -> EmptyDirectoriesResult:
+    """Recursively search for and remove empty directories within a path.
+
+    With confirm=False (the default) nothing is deleted: the same scan runs
+    and a preview is returned, so call it first to see what would go. Re-run
+    with confirm=True to perform the deletion.
+    """
+
+    deleted_count = 0
+    deleted_dirs = []
+    skipped_count = 0
+    skipped_dirs = []
+    failed_count = 0
+    failed_dirs = []
+
+    async def deleteSubDir(directory: Path):
+        nonlocal deleted_count, deleted_dirs, failed_count, failed_dirs
+        await ctx.info(f"Deleting empty directory: {directory}")
+        try:
+            send2trash(str(directory))
+        except OSError as exc:
+            failed_count += 1
+            failed_dirs.append(str(directory))
+            await ctx.warning(
+                f"Failed to delete empty directory '{directory}': "
+                f"{type(exc).__name__}: {exc}"
+            )
+            return
+        deleted_count += 1
+        deleted_dirs.append(str(directory))
+
+    async def build_preview_result(callback):
+        import inspect
+
+        nonlocal skipped_count, skipped_dirs
+
+        if recursive:
+            subdirs = sorted(
+                [d for d in p.rglob("*") if d.is_dir()],
+                key=lambda p: len(p.parts),
+                reverse=True,
+            )
+
+        else:
+            subdirs = [d for d in p.iterdir() if d.is_dir()]
+
+        for subdir in subdirs:
+            try:
+                contents = list(subdir.iterdir())
+            except OSError as exc:
+                skipped_count += 1
+                skipped_dirs.append(str(subdir))
+                await ctx.warning(
+                    f"Skipped unreadable directory '{subdir}': "
+                    f"{type(exc).__name__}: {exc}"
+                )
+                continue
+            if not contents:
+                res = callback(subdir)
+
+                if inspect.iscoroutine(res):
+                    await res
+
+    try:
+        p = Path(path)
+        if not p.exists():
+            await ctx.error(f"delete_empty_directories failed: {path} does not exist")
+            return path_error("delete_empty_directories", path)
+
+        if not p.is_dir():
+            await ctx.error(
+                f"delete_empty_directories failed: {path} is not a directory"
+            )
+            return path_error("delete_empty_directories", path)
+
+        if not confirm:
+            virtual_deleted = []
+
+            await build_preview_result(
+                lambda folder: virtual_deleted.append(str(folder))
+            )
+
+            return {
+                "mode": "preview",
+                "path": str(p),
+                "recursive": recursive,
+                "requires_confirmation": True,
+                "deleted_directories_count": 0,
+                "deleted_directories": [],
+                "skipped_directories_count": 0,
+                "skipped_directories": [],
+                "failed_directories_count": 0,
+                "failed_directories": [],
+            }
+
+        await build_preview_result(deleteSubDir)
+
+        return {
+            "mode": "executed",
+            "path": str(p),
+            "recursive": recursive,
+            "requires_confirmation": False,
+            "deleted_directories_count": deleted_count,
+            "deleted_directories": deleted_dirs,
+            "skipped_directories_count": skipped_count,
+            "skipped_directories": skipped_dirs,
+            "failed_directories_count": failed_count,
+            "failed_directories": failed_dirs,
+        }
+
+    except Exception as exc:
+        await ctx.error(f"delete_empty_directories failed: {type(exc).__name__}: {exc}")
+        return unexpected_error("delete_empty_directories", path, exc)
 
 
 # 3. clean_temp_files - remove temporary files (.tmp, .bak, ~*, etc.)
