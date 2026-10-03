@@ -7,7 +7,11 @@ from fastmcp import Context
 from mcp.types import ToolAnnotations
 
 from storage_intelligence.core import mcp
-from storage_intelligence.utils import path_error, unexpected_error
+from storage_intelligence.utils import (
+    FindEmptyDirectoriesResult,
+    path_error,
+    unexpected_error,
+)
 
 # ===============================================
 # List of storage analysis tools, in the order they are implemented:
@@ -24,6 +28,7 @@ from storage_intelligence.utils import path_error, unexpected_error
 # 10. find_large_files - which files are bigger than a threshold?
 # 11. find_duplicate_files - are there identical files lurking around?
 # 12. find_stale_files - which files haven't been accessed in a while?
+# 13. find_empty_directories - which folders would be cleaned up?
 # ===============================================
 
 # Read only annotation hint, because these tools do not modify the file system
@@ -31,6 +36,11 @@ READ_ONLY = ToolAnnotations(readOnlyHint=True)
 
 # Home directory for the user
 DEFAULT_PATH = str(Path.home())
+
+# Cap the sample list so a broad scan cannot flood the model's context: a
+# recursive search of the home directory can match tens of thousands of paths.
+# The exact count is reported separately and is never truncated.
+SAMPLE_LIMIT = 25
 
 
 # 1. list_directory - what's in this folder?
@@ -434,3 +444,91 @@ async def find_stale_files(
     except Exception as exc:
         await ctx.error(f"find_stale_files failed: {type(exc).__name__}: {exc}")
         return unexpected_error("find_stale_files", path, exc)
+
+
+# 13. find_empty_directories - which folders would be cleaned up?
+@mcp.tool(annotations=READ_ONLY)
+async def find_empty_directories(
+    ctx: Context, path: str = DEFAULT_PATH, recursive: bool = True
+) -> FindEmptyDirectoriesResult:
+    """Find empty directories, including parents left empty by their children.
+
+    Nothing is deleted. Reports what `delete_empty_directories` would remove if
+    confirmed, so the two can be compared before acting.
+
+    The cascade is simulated rather than read off the filesystem. In a chain like
+    `a/b/c`, only `c` is empty right now; `a/b` and `a` become empty once `c` is
+    gone. A plain scan would report just `c`, so directories are walked deepest
+    first and each candidate's already-matched children are filtered out of its
+    listing. Paths come back deepest first, which is the order they must be
+    deleted in.
+
+    Directories that cannot be read (usually permissions) are counted in
+    `skipped_directories` rather than treated as empty, so an unreadable folder
+    is never proposed for deletion.
+    """
+    try:
+        p = Path(path)
+        if not p.exists():
+            await ctx.error(f"find_empty_directories failed: {path} does not exist")
+            return path_error("find_empty_directories", path)
+        if not p.is_dir():
+            await ctx.error(f"find_empty_directories failed: {path} is not a directory")
+            return path_error("find_empty_directories", path)
+
+        if recursive:
+            subdirs = sorted(
+                [d for d in p.rglob("*") if d.is_dir()],
+                key=lambda d: len(d.parts),
+                reverse=True,
+            )
+        else:
+            subdirs = [d for d in p.iterdir() if d.is_dir()]
+
+        await ctx.info(
+            f"Scanning for empty directories in: {path} (recursive={recursive})"
+        )
+
+        # Directories that would be deleted. Read-only here: nothing is removed,
+        # so this is a prediction of what a delete run would remove.
+        virtual_deleted: set[Path] = set()
+        skipped_dirs: list[str] = []
+
+        for subdir in subdirs:
+            try:
+                contents = list(subdir.iterdir())
+            except OSError as exc:
+                skipped_dirs.append(str(subdir))
+                await ctx.warning(
+                    f"Skipped unreadable directory '{subdir}': "
+                    f"{type(exc).__name__}: {exc}"
+                )
+                continue
+            # A child already in the set still shows up in its parent's listing,
+            # because nothing was actually removed. Filter those out before
+            # judging emptiness, otherwise a parent that becomes empty only
+            # because its children were deleted is never reported.
+            remaining = [c for c in contents if c not in virtual_deleted]
+
+            if not remaining:
+                virtual_deleted.add(subdir)
+
+        # Deepest first, and tie-break on the path so the order is stable across
+        # runs. This is not cosmetic: it is the order the paths must be deleted
+        # in. Trashing a parent first would succeed and carry its children away
+        # with it, leaving every child to fail afterwards as "File not found".
+        candidates = sorted(virtual_deleted, key=lambda d: (-len(d.parts), str(d)))
+        total = len(candidates)
+
+        return {
+            "path": str(p),
+            "recursive": recursive,
+            "total_empty_directories": total,
+            "sample": [str(d) for d in candidates[:SAMPLE_LIMIT]],
+            "truncated": total > SAMPLE_LIMIT,
+            "skipped_directories_count": len(skipped_dirs),
+            "skipped_directories": skipped_dirs,
+        }
+    except Exception as exc:
+        await ctx.error(f"find_empty_directories failed: {type(exc).__name__}: {exc}")
+        return unexpected_error("find_empty_directories", path, exc)

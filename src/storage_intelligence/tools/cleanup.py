@@ -67,6 +67,10 @@ async def delete_empty_directories(
     with confirm=True to perform the deletion.
     """
 
+    # Cap the preview list so a broad scan cannot flood the model's context
+    PREVIEW_SAMPLE_LIMIT = 25
+
+    virtual_deleted: set[Path] = set()
     deleted_count = 0
     deleted_dirs = []
     skipped_count = 0
@@ -74,8 +78,14 @@ async def delete_empty_directories(
     failed_count = 0
     failed_dirs = []
 
-    async def deleteSubDir(directory: Path):
-        nonlocal deleted_count, deleted_dirs, failed_count, failed_dirs
+    async def deleteSubDir(directory: Path) -> bool:
+        """Trash one empty directory. Returns True only if it is really gone.
+
+        The caller uses that to decide whether a parent directory is now empty:
+        a failed send2trash leaves the child in place, so counting it as
+        deleted would make the parent look deletable when it is not.
+        """
+        nonlocal deleted_count, failed_count
         await ctx.info(f"Deleting empty directory: {directory}")
         try:
             send2trash(str(directory))
@@ -86,13 +96,12 @@ async def delete_empty_directories(
                 f"Failed to delete empty directory '{directory}': "
                 f"{type(exc).__name__}: {exc}"
             )
-            return
+            return False
         deleted_count += 1
         deleted_dirs.append(str(directory))
+        return True
 
-    async def build_preview_result(callback):
-        import inspect
-
+    async def build_preview_result():
         nonlocal skipped_count, skipped_dirs
 
         if recursive:
@@ -116,11 +125,19 @@ async def delete_empty_directories(
                     f"{type(exc).__name__}: {exc}"
                 )
                 continue
-            if not contents:
-                res = callback(subdir)
+            # A child that has been trashed (or claimed by the preview) still
+            # shows up in its parent's listing, so filter those out before
+            # judging emptiness. Without this, a parent that becomes empty
+            # because its children were removed is never detected, and preview
+            # under-reports the cascade that execution performs.
+            remaining = [c for c in contents if c not in virtual_deleted]
 
-                if inspect.iscoroutine(res):
-                    await res
+            if not remaining:
+                if confirm:
+                    if await deleteSubDir(subdir):
+                        virtual_deleted.add(subdir)
+                else:
+                    virtual_deleted.add(subdir)
 
     try:
         p = Path(path)
@@ -135,26 +152,28 @@ async def delete_empty_directories(
             return path_error("delete_empty_directories", path)
 
         if not confirm:
-            virtual_deleted = []
+            await build_preview_result()
 
-            await build_preview_result(
-                lambda folder: virtual_deleted.append(str(folder))
-            )
+            candidates = sorted(str(d) for d in virtual_deleted)
+            total = len(candidates)
 
             return {
                 "mode": "preview",
                 "path": str(p),
                 "recursive": recursive,
                 "requires_confirmation": True,
+                "total_empty_directories": total,
+                "sample": candidates[:PREVIEW_SAMPLE_LIMIT],
+                "truncated": total > PREVIEW_SAMPLE_LIMIT,
                 "deleted_directories_count": 0,
                 "deleted_directories": [],
-                "skipped_directories_count": 0,
-                "skipped_directories": [],
-                "failed_directories_count": 0,
-                "failed_directories": [],
+                "skipped_directories_count": skipped_count,
+                "skipped_directories": skipped_dirs,
+                "failed_directories_count": failed_count,
+                "failed_directories": failed_dirs,
             }
 
-        await build_preview_result(deleteSubDir)
+        await build_preview_result()
 
         return {
             "mode": "executed",
@@ -174,59 +193,55 @@ async def delete_empty_directories(
         return unexpected_error("delete_empty_directories", path, exc)
 
 
-# 3. clean_temp_files - remove temporary files (.tmp, .bak, ~*, etc.)
+# ========================================================
+# ========ONLY WRITE CODE BELOW THIS COMMENT, LEAVE CODE ABOVE FOR NOW================
+# ========================================================
+# 3. trash_path - delete a specific file safely
 @mcp.tool(annotations=DESTRUCTIVE)
-async def clean_temp_files(
-    ctx: Context,
-    path: str = DEFAULT_PATH,
-    patterns: list[str] | None = None,
-    dry_run: bool = True,
-    confirm: bool = False,
-) -> dict:
-    """Search for and delete temporary files matching specified glob patterns."""
-    # TODO: Implement pattern matching for temp files and safe deletion/dry-run options.
-    pass
+async def trash_path(
+    ctx: Context, path: str | list[str], confirm: bool = False
+) -> str | dict:
+    """Delete a single file or directory at the specified path."""
+    try:
+        targets = [path] if isinstance(path, str) else path
 
+        existing = [p for p in targets if Path(p).exists()]
+        missing = [p for p in targets if not Path(p).exists()]
 
-# 4. remove_duplicate_files - remove duplicate files keeping one original copy
-@mcp.tool(annotations=DESTRUCTIVE)
-async def remove_duplicate_files(
-    ctx: Context,
-    path: str = DEFAULT_PATH,
-    dry_run: bool = True,
-    confirm: bool = False,
-) -> dict:
-    """Identify duplicate files by hash and remove redundant copies."""
-    # TODO: Implement hash comparison to detect duplicates and delete
-    # redundant copies safely.
-    pass
+        if missing and not existing:
+            await ctx.error(f"trash_path failed: paths do not exist: {missing}")
+            return path_error("trash_path", str(missing))
 
+        if not confirm:
+            return {
+                "mode": "preview",
+                "requires_confirmation": True,
+                "total_valid_paths": len(existing),
+                "paths": existing,
+                "missing_paths": missing,
+                "message": "Dry run: Call trash_path with confirm=True to send items to"
+                " trash.",
+            }
 
-# 5. archive_stale_files - move or compress files unmodified for X days
-@mcp.tool(annotations=DESTRUCTIVE)
-async def archive_stale_files(
-    ctx: Context,
-    path: str = DEFAULT_PATH,
-    days_unmodified: int = 90,
-    destination_archive: str = "",
-    dry_run: bool = True,
-    confirm: bool = False,
-) -> dict:
-    """Archive files that have not been modified within the specified threshold."""
-    # TODO: Implement stale file scanning and moving/compressing logic to
-    # an archive destination.
-    pass
+        deleted = []
+        failed = []
+        for p in existing:
+            try:
+                send2trash(p)
+                await ctx.info(f"Deleted file: {p}")
+                deleted.append(p)
+            except Exception as exc:
+                failed.append({"path": p, "error": str(exc)})
+                await ctx.error(f"trash_path failed: {type(exc).__name__}: {exc}")
 
+        return {
+            "mode": "executed",
+            "deleted_count": len(deleted),
+            "failed_count": len(failed),
+            "deleted": deleted,
+            "failed": failed,
+            "missing_paths": missing,
+        }
 
-# 6. clean_cache_directories - clear cache directories (__pycache__, .cache, etc.)
-@mcp.tool(annotations=DESTRUCTIVE)
-async def clean_cache_directories(
-    ctx: Context,
-    path: str = DEFAULT_PATH,
-    dry_run: bool = True,
-    confirm: bool = False,
-) -> dict:
-    """Find and clear standard system/application cache directories."""
-    # TODO: Implement directory pattern matching for known cache folders
-    # and removal logic.
-    pass
+    except Exception as exc:
+        return unexpected_error("trash_path", path, exc)

@@ -19,6 +19,40 @@ from fastmcp.tools import ToolResult
 #                        rather than a recoverable condition.
 
 
+class FindEmptyDirectoriesResult(TypedDict):
+    """Successful `find_empty_directories` result.
+
+    Read-only counterpart to `delete_empty_directories`: it reports what *would*
+    be deleted, including the parent directories that only become empty once
+    their children are removed, without touching the filesystem.
+
+        path - the root that was searched.
+        recursive - whether subdirectories were searched at all depth.
+        total_empty_directories - exact count of directories that would be
+            deleted. Never truncated, so it stays a cheap integer even when the
+            scan matches tens of thousands of paths.
+        sample - bounded excerpt of those paths, deepest first. Capped because
+            the result is read into the model's context; a recursive scan of
+            the home directory would otherwise return the whole tree as strings.
+        truncated - whether `sample` is shorter than the total. Without this an
+            agent cannot tell a bounded excerpt from a complete list and may
+            describe the total as though it had seen every path.
+        skipped_directories_count - directories that could not be read, most
+            often due to permissions. Reported here so the agent learns it will
+            need Full Disk Access (or similar) *before* deleting, rather than
+            discovering an under-deleting run afterwards.
+        skipped_directories - the unreadable paths.
+    """
+
+    path: str
+    recursive: bool
+    total_empty_directories: int
+    sample: list[str]
+    truncated: bool
+    skipped_directories_count: int
+    skipped_directories: list[str]
+
+
 class EmptyDirectoriesResult(TypedDict):
     """Successful `delete_empty_directories` result.
 
