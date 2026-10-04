@@ -14,6 +14,7 @@ Every tool function exposed via FastMCP should follow this pattern:
 ```python
 from mcp.server.fastmcp import Context, FastMCP
 
+
 @mcp.tool()
 async def example_tool(path: str, confirm: bool = False, ctx: Context = None) -> dict:
     """Clear, concise docstring explaining what the tool does.
@@ -33,7 +34,7 @@ async def example_tool(path: str, confirm: bool = False, ctx: Context = None) ->
                 "mode": "preview",
                 "requires_confirmation": True,
                 "target": path,
-                "message": "Call with confirm=True to apply changes."
+                "message": "Call with confirm=True to apply changes.",
             }
 
         # 3. Execution
@@ -43,7 +44,7 @@ async def example_tool(path: str, confirm: bool = False, ctx: Context = None) ->
             "mode": "executed",
             "requires_confirmation": False,
             "target": path,
-            "status": "success"
+            "status": "success",
         }
 
     except Exception as exc:

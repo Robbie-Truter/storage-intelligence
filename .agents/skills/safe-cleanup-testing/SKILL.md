@@ -25,6 +25,7 @@ import pytest
 from pathlib import Path
 from storage_intelligence.tools.cleanup import trash_path
 
+
 @pytest.mark.asyncio
 async def test_trash_path_dry_run(tmp_path, mock_context):
     test_file = tmp_path / "sample.txt"
