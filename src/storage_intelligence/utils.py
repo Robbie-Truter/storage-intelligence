@@ -53,45 +53,38 @@ class FindEmptyDirectoriesResult(TypedDict):
     skipped_directories: list[str]
 
 
-class EmptyDirectoriesResult(TypedDict):
-    """Successful `delete_empty_directories` result.
+class TrashPathResult(TypedDict):
+    """Successful `trash_path` result.
 
-    `mode` is the discriminator: `preview` means nothing was deleted and
-    `requires_confirmation` is True; `executed` means the scan ran with
-    confirmation and the deleted/skipped/failed fields describe the outcome.
-    Every field is always present so clients can rely on the shape, except the
-    three preview-only fields, which are omitted entirely when `executed`.
+    `mode` is the discriminator: `preview` means nothing was trashed and
+    `requires_confirmation` is True; `executed` means the targets were sent to
+    the trash and `deleted`/`failed` describe the outcome.
 
-    Preview-only, present only when `mode` is `preview`:
-        total_empty_directories - exact count of directories that would be
-            deleted. Never truncated, so it stays a cheap integer even when
-            the scan matches tens of thousands of paths.
-        sample - bounded excerpt of those paths. Capped because the result is
-            read into the model's context; a recursive scan of the home
-            directory would otherwise return the whole tree as strings.
-        truncated - whether `sample` is shorter than the total. Without this an
-            agent cannot tell a bounded excerpt from a complete list and may
-            describe the total as though it had seen every path.
+        paths - the targets that existed, deepest path first. Present in both
+            modes so the two can be compared directly: in `executed` it is the
+            set that was attempted, and `deleted` + `failed` partitions it.
+        missing_paths - targets that did not exist. Tolerated rather than fatal,
+            because one stale path should not abort a batch, but always reported
+            so the caller can tell a shorter delete from a failed one.
+        total_valid_paths - how many targets existed, i.e. len(paths).
 
-    These are omitted rather than left empty in `executed` mode, where
-    `deleted_directories` already reports every affected path. An empty
-    `sample` there would be ambiguous between "nothing matched", "nothing
-    pending" and "not applicable", and the cheapest reading is to ignore it.
+    Present only when `mode` is `executed`:
+        deleted - targets actually sent to the trash.
+        failed - targets that raised, each with its error. A path can land here
+            because send2trash rejected it, not because it still exists.
+
+    Present only when `mode` is `preview`:
+        message - what to do next, so the agent does not have to infer it.
     """
 
     mode: Literal["preview", "executed"]
-    path: str
-    recursive: bool
     requires_confirmation: bool
-    deleted_directories_count: int
-    deleted_directories: list[str]
-    skipped_directories_count: int
-    skipped_directories: list[str]
-    failed_directories_count: int
-    failed_directories: list[str]
-    total_empty_directories: NotRequired[int]
-    sample: NotRequired[list[str]]
-    truncated: NotRequired[bool]
+    paths: list[str]
+    missing_paths: list[str]
+    total_valid_paths: int
+    deleted: NotRequired[list[str]]
+    failed: NotRequired[list[dict]]
+    message: NotRequired[str]
 
 
 def path_error(tool: str, path: str) -> ToolResult:
