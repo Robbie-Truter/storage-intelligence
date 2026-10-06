@@ -34,8 +34,8 @@ Features:
 │   server.py   Entry point — imports and registers primitives           │
 │                                                                        │
 │   Exposed Primitives:                                                  │
-│   ├── Tools        storage.py   12 read-only analysis tools            │
-│   │                cleanup.py   6 cleanup tools (defined, planned)     │
+│   ├── Tools        storage.py   10 read-only analysis tools            │
+│   │                cleanup.py   1 cleanup tool                          │
 │   ├── Resources    resources/   System storage views & metadata        │
 │   └── Prompts      prompts/     Predefined templates for analysis      │
 └───────────────────────────────────┬────────────────────────────────────┘
