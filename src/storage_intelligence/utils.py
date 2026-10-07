@@ -220,11 +220,14 @@ class FindJunkFilesResult(TypedDict):
     """Successful `find_junk_files` result.
 
     path - the directory that was inspected (direct children only).
-    total_files - how many junk files matched; never truncated.
-        by_extension - count per matching suffix, largest count first,
-            ties broken alphabetically. `.DS_Store` files group under
-            ".ds_store" because a leading-dot name has no suffix to match
-            on.
+    total_files - how many junk files matched; directories are not
+        counted here. Never truncated.
+    by_extension - count per matching suffix, largest count first, ties
+        broken alphabetically. `.DS_Store` files group under ".ds_store"
+        because a leading-dot name has no suffix to match on.
+    directories - full paths of top-level build-artifact directories
+        (node_modules, __pycache__, dist, build, target). Uncapped: a
+        name can appear only once at one level.
     sample - the first matching paths, capped at SAMPLE_LIMIT so the
         result can be handed straight to `trash_path`.
     truncated - whether `sample` is shorter than `total_files`. Without
@@ -234,6 +237,7 @@ class FindJunkFilesResult(TypedDict):
     path: str
     total_files: int
     by_extension: dict[str, int]
+    directories: list[str]
     sample: list[str]
     truncated: bool
 

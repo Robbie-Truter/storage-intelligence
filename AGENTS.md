@@ -28,13 +28,13 @@ For each todo item fixed, generate a commit message based on my commit message n
 - [x] `file_info:323-324` - `created: stat.st_ctime` is inode change time on POSIX, not creation. macOS has `st_birthtime`; Linux has no birth time. Rename the field or fix the docstring.
 - [x] Nondeterministic tie order in `count_files:186` and `find_junk_files:674` - sort by `(-count, name)` so ties don't follow filesystem order.
 - [x] Result-shape drift - `get_disk_usage` and `find_junk_files` include `"path"`; `count_files` and `directory_disk_usage` don't. Align the storage tools on including it.
-- [ ] Broken-symlink edge in `directory_disk_usage:244-251` - non-file, non-dir children fall into the `else` branch, get size 0, and are labeled `"directory"`.
-- [ ] `find_junk_files` build-artifact gap - header line 30 and the plan promise `node_modules`, `__pycache__`, `dist`, `build`, `target`; code matches only extensions + `.DS_Store`. Implement directory-name matching or amend the header.
+- [x] Broken-symlink edge in `directory_disk_usage:244-251` - non-file, non-dir children fall into the `else` branch, get size 0, and are labeled `"directory"`.
+- [x] `find_junk_files` build-artifact gap - header line 30 and the plan promise `node_modules`, `__pycache__`, `dist`, `build`, `target`; code matches only extensions + `.DS_Store`. Implement directory-name matching or amend the header.
 
 ### Docstrings, arguments, comments
 
-- [ ] `find_junk_files:629` - docstring hardcodes "capped at 25" while code uses `SAMPLE_LIMIT`; reference the constant instead.
+- [x] `find_junk_files:629` - docstring hardcodes "capped at 25" while code uses `SAMPLE_LIMIT`; reference the constant instead.
 - [ ] `trash_path:32-39` - docstring silent on dedup (:48-51) and missing-path tolerance (:53-63); both are implemented, the model needs to know before batching.
 - [ ] `find_stale_files:472-473` - "Results are uncapped in count but cut at `max_results`" is self-contradictory; means the scan is uncapped but output is cut.
 - [ ] `explore_directory:92` - honest that `max_results` truncation is silent, but `str` return leaves no room for a `truncated` flag; consider a structured return like the other tools.
-- [ ] Header comment (storage.py:30) claims `find_junk_files` covers build artifacts - disagrees with docstring and code (resolve together with the validity item above).
+- [x] Header comment (storage.py:30) claims `find_junk_files` covers build artifacts - disagrees with docstring and code (resolve together with the validity item above).

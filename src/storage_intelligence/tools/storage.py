@@ -75,6 +75,13 @@ JUNK_EXTENSIONS: frozenset[str] = frozenset(
     }
 )
 
+# Build-artifact directory names matched by find_junk_files. Compared
+# case-sensitively against top-level entry names: these are conventional
+# spellings, and a lowercase "Dist" directory is not one of them.
+JUNK_DIRECTORIES: frozenset[str] = frozenset(
+    {"node_modules", "__pycache__", "dist", "build", "target"}
+)
+
 
 # 1. explore_directory - list_directory + file_names + search_files + tree
 @mcp.tool(annotations=READ_ONLY)
@@ -215,7 +222,10 @@ async def directory_disk_usage(
     its parent is among the top results. Sorted largest first.
 
     Unreadable files are skipped silently rather than reported, so a single
-    permissions problem or race cannot abort the ranking.
+    permissions problem or race cannot abort the ranking. Broken symlinks
+    and other special files (sockets, FIFOs) are skipped too -- they are
+    neither regular files nor directories, and would otherwise be ranked
+    as zero-byte directories.
 
     Args:
         path: Absolute directory path whose children should be ranked.
@@ -259,7 +269,7 @@ async def directory_disk_usage(
                         "size_bytes": size_bytes,
                     }
                 )
-            else:
+            elif child.is_dir():
                 results.append(
                     {
                         "name": child.name,
@@ -267,6 +277,8 @@ async def directory_disk_usage(
                         "size_bytes": dir_size(child),
                     }
                 )
+            else:
+                continue
         results.sort(key=lambda x: x["size_bytes"], reverse=True)
 
         return {"path": str(p), "entries": results[:top_n]}
@@ -647,7 +659,7 @@ async def find_empty_directories(
 async def find_junk_files(
     ctx: Context, path: str = DEFAULT_PATH
 ) -> FindJunkFilesResult:
-    """Find junk files in a directory, grouped by file extension.
+    """Find junk files and build-artifact directories in a directory.
 
     Junk files are identified by suffix, comparing each file's lowercased
     suffix against a fixed list (see JUNK_EXTENSIONS): .log, .tmp, .temp,
@@ -655,11 +667,16 @@ async def find_junk_files(
     .a, .so, .out. The filename `.DS_Store` is also matched by name, since it
     has no suffix.
 
-    Non-recursive: only files directly inside `path` are inspected. Returns
-    counts plus a `sample` of matching paths capped at 25, so results can be
-    passed straight to `trash_path`. `truncated` reports whether the sample is
-    shorter than the total. Build-artifact directories such as `node_modules`,
-    `__pycache__`, `dist`, `build` and `target` are not covered yet.
+    Directories are matched by name instead: top-level entries called
+    `node_modules`, `__pycache__`, `dist`, `build` or `target` (see
+    JUNK_DIRECTORIES) are reported in `directories` as full paths. Names are
+    unique within one directory, so that list is never capped and is not
+    reflected in `total_files` or `by_extension`, which count files only.
+
+    Non-recursive: only direct children of `path` are inspected. Returns
+    counts plus a `sample` of matching paths capped at `SAMPLE_LIMIT`, so
+    `sample` and `directories` can both be passed straight to `trash_path`.
+    `truncated` reports whether `sample` is shorter than `total_files`.
 
     Args:
         path: Absolute directory path to inspect. Defaults to the home directory.
@@ -675,17 +692,24 @@ async def find_junk_files(
             await ctx.error(f"find_junk_files failed: {path} is not a directory")
             return path_error("find_junk_files", path)
 
-        await ctx.info(f"Counting junk files in: {path}")
+        await ctx.info(f"Counting junk files and build directories in: {path}")
 
         total = 0
         by_extension: dict[str, int] = {}
+        directories: list[str] = []
         sample: list[str] = []
 
         for child in p.iterdir():
+            if child.is_dir():
+                if child.name in JUNK_DIRECTORIES:
+                    directories.append(str(child))
+                continue
+
             if not child.is_file():
                 continue
 
             suffix = child.suffix.lower()
+
             if suffix in JUNK_EXTENSIONS:
                 ext = suffix
             elif child.name == ".DS_Store":
@@ -695,6 +719,7 @@ async def find_junk_files(
 
             total += 1
             by_extension[ext] = by_extension.get(ext, 0) + 1
+
             if len(sample) < SAMPLE_LIMIT:
                 sample.append(str(child))
 
@@ -704,6 +729,7 @@ async def find_junk_files(
             "by_extension": dict(
                 sorted(by_extension.items(), key=lambda x: (-x[1], x[0]))
             ),
+            "directories": sorted(directories),
             "sample": sample,
             "truncated": total > SAMPLE_LIMIT,
         }
