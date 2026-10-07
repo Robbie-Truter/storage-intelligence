@@ -92,12 +92,15 @@ class CountFilesResult(TypedDict):
 
     Non-recursive snapshot of the files directly inside the directory.
 
+        path - the directory that was inspected (direct children only).
         total_files - how many files matched, before grouping.
-        by_extension - count per lowercased extension, largest count first.
+        by_extension - count per lowercased extension, largest count first,
+            ties broken alphabetically so the order is stable across runs.
             Files without an extension group under "(no extension)" so the
             groups still add up to `total_files`.
     """
 
+    path: str
     total_files: int
     by_extension: dict[str, int]
 
@@ -115,6 +118,19 @@ class DirectoryUsageEntry(TypedDict):
     name: str
     type: Literal["file", "directory"]
     size_bytes: int
+
+
+class DirectoryDiskUsageResult(TypedDict):
+    """Successful `directory_disk_usage` result.
+
+    path - the directory whose children were ranked.
+    entries - the largest immediate children, largest first, capped at
+        top_n. Bare names, relative to `path`, so an empty result still
+        says which directory was measured.
+    """
+
+    path: str
+    entries: list[DirectoryUsageEntry]
 
 
 class GetDiskUsageResult(TypedDict):
@@ -205,9 +221,10 @@ class FindJunkFilesResult(TypedDict):
 
     path - the directory that was inspected (direct children only).
     total_files - how many junk files matched; never truncated.
-    by_extension - count per matching suffix, largest count first.
-        `.DS_Store` files group under ".ds_store" because a leading-dot
-        name has no suffix to match on.
+        by_extension - count per matching suffix, largest count first,
+            ties broken alphabetically. `.DS_Store` files group under
+            ".ds_store" because a leading-dot name has no suffix to match
+            on.
     sample - the first matching paths, capped at SAMPLE_LIMIT so the
         result can be handed straight to `trash_path`.
     truncated - whether `sample` is shorter than `total_files`. Without

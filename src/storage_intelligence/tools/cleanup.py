@@ -20,9 +20,6 @@ from storage_intelligence.utils import (
 # Destructive annotation hint because cleanup tools modify or delete files
 DESTRUCTIVE = ToolAnnotations(readOnlyHint=False, destructiveHint=True)
 
-# Home directory for the user
-DEFAULT_PATH = str(Path.home())
-
 
 # 1. trash_path - delete a specific file or directory safely
 @mcp.tool(annotations=DESTRUCTIVE)

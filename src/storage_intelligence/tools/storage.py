@@ -11,7 +11,7 @@ from mcp.types import ToolAnnotations
 from storage_intelligence.core import mcp
 from storage_intelligence.utils import (
     CountFilesResult,
-    DirectoryUsageEntry,
+    DirectoryDiskUsageResult,
     DuplicateFileGroup,
     FileInfoResult,
     FindEmptyDirectoriesResult,
@@ -190,8 +190,11 @@ async def count_files(ctx: Context, path: str = DEFAULT_PATH) -> CountFilesResul
                 by_extension[ext] = by_extension.get(ext, 0) + 1
 
         return {
+            "path": str(p),
             "total_files": total,
-            "by_extension": dict(sorted(by_extension.items(), key=lambda x: -x[1])),
+            "by_extension": dict(
+                sorted(by_extension.items(), key=lambda x: (-x[1], x[0]))
+            ),
         }
     except Exception as exc:
         await ctx.error(f"count_files failed: {type(exc).__name__}: {exc}")
@@ -202,7 +205,7 @@ async def count_files(ctx: Context, path: str = DEFAULT_PATH) -> CountFilesResul
 @mcp.tool(annotations=READ_ONLY)
 async def directory_disk_usage(
     ctx: Context, path: str = DEFAULT_PATH, top_n: int = 10
-) -> list[DirectoryUsageEntry]:
+) -> DirectoryDiskUsageResult:
     """Find the largest immediate children of a directory, in bytes.
 
     Ranks only the direct children of `path`, though each directory's size is
@@ -265,7 +268,9 @@ async def directory_disk_usage(
                     }
                 )
         results.sort(key=lambda x: x["size_bytes"], reverse=True)
-        return results[:top_n]
+
+        return {"path": str(p), "entries": results[:top_n]}
+
     except Exception as exc:
         await ctx.error(f"directory_disk_usage failed: {type(exc).__name__}: {exc}")
         return unexpected_error("directory_disk_usage", path, exc)
@@ -696,7 +701,9 @@ async def find_junk_files(
         return {
             "path": str(p),
             "total_files": total,
-            "by_extension": dict(sorted(by_extension.items(), key=lambda x: -x[1])),
+            "by_extension": dict(
+                sorted(by_extension.items(), key=lambda x: (-x[1], x[0]))
+            ),
             "sample": sample,
             "truncated": total > SAMPLE_LIMIT,
         }
