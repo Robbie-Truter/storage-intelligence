@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   ci:
-    name: Lint, Format & Test
+    name: Lint, Format, Type Check & Test
     runs-on: ubuntu-latest
 
     steps:
@@ -34,6 +34,9 @@ jobs:
 
       - name: Ruff Format Check
         run: uv run ruff format --check .
+
+      - name: Pyright Type Check
+        run: uv run pyright
 
       - name: Build Package
         run: uv build
