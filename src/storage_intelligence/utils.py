@@ -144,8 +144,10 @@ class FileInfoResult(TypedDict):
     size_bytes - the entry's own size. For a directory this is the small
         platform-dependent inode size, not its contents' total.
     modified - `st_mtime` as a Unix timestamp.
-    created - `st_ctime` as a Unix timestamp. On POSIX this is the last
-        metadata-change time, not a true creation time.
+        created - creation time as a Unix timestamp. Prefers the platform's
+            birth time (`st_birthtime` on macOS); falls back to `st_ctime`
+            where none exists -- creation time on Windows, last metadata
+            change on Linux.
     extension - suffix including the dot, or "" when there is none.
     """
 

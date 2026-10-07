@@ -320,6 +320,10 @@ async def file_info(ctx: Context, path: str = DEFAULT_PATH) -> FileInfoResult:
     platform-dependent `size_bytes` that reflects the entry itself, not the
     space its contents occupy.
 
+    `created` prefers the platform's birth time (macOS `st_birthtime`); where
+    none exists it falls back to `st_ctime`, which is creation time on
+    Windows but last-metadata-change time on Linux.
+
     Args:
         path: Absolute path to the file or directory to inspect.
     """
@@ -328,17 +332,21 @@ async def file_info(ctx: Context, path: str = DEFAULT_PATH) -> FileInfoResult:
         if not p.exists():
             await ctx.error(f"file_info failed: {path} does not exist")
             return path_error("file_info", path)
+
         await ctx.info(f"Getting metadata for: {path}")
+
         stat = p.stat()
+
         return {
             "name": p.name,
             "path": str(p),
             "type": "directory" if p.is_dir() else "file",
             "size_bytes": stat.st_size,
             "modified": stat.st_mtime,
-            "created": stat.st_ctime,
+            "created": getattr(stat, "st_birthtime", stat.st_ctime),
             "extension": p.suffix,
         }
+
     except Exception as exc:
         await ctx.error(f"file_info failed: {type(exc).__name__}: {exc}")
         return unexpected_error("file_info", path, exc)

@@ -25,7 +25,7 @@ For each todo item fixed, generate a commit message based on my commit message n
 
 - [x] TypedDicts for the 8 bare-dict storage tools so FastMCP advertises output schemas: `count_files` (storage.py:150), `directory_disk_usage` (:197), `get_disk_usage` (:261), `file_info` (:300), `find_large_files` (:339), `find_duplicate_files` (:389), `find_stale_files` (:462), `find_junk_files` (:619). Only `find_empty_directories` and `trash_path` have them today (see utils.py:7-13 rationale).
 - [x] `directory_disk_usage:241` - top-level file `stat()` not wrapped in `try/except OSError`, unlike `dir_size` (:225-228). One unreadable file aborts the whole ranking; sibling tools skip silently.
-- [ ] `file_info:323-324` - `created: stat.st_ctime` is inode change time on POSIX, not creation. macOS has `st_birthtime`; Linux has no birth time. Rename the field or fix the docstring.
+- [x] `file_info:323-324` - `created: stat.st_ctime` is inode change time on POSIX, not creation. macOS has `st_birthtime`; Linux has no birth time. Rename the field or fix the docstring.
 - [ ] `cleanup.py:24` - `DEFAULT_PATH` is unused dead code (`trash_path.path` is required).
 - [ ] Nondeterministic tie order in `count_files:186` and `find_junk_files:674` - sort by `(-count, name)` so ties don't follow filesystem order.
 - [ ] Result-shape drift - `get_disk_usage` and `find_junk_files` include `"path"`; `count_files` and `directory_disk_usage` don't. Align the storage tools on including it.
