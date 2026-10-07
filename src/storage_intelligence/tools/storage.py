@@ -27,16 +27,16 @@ from storage_intelligence.utils import (
 # ===============================================
 # List of storage analysis tools, in the order they are implemented:
 # ===============================================
-# 1. explore_directory - list_directory + file_names + search_files + tree
+# 1. explore_directory - what is in this directory?
 # 2. count_files - how many files of each type are in this folder?
-# 3. directory_disk_usage - directory_sizes + directory_disk_usage
-# 4. get_disk_usage - keep for now
-# 5. file_info - keep for now
-# 6. find_large_files - keep for now
-# 7. find_duplicate_files - keep for now
-# 8. find_stale_files - keep for now
-# 9. find_empty_directories - keep for now
-# 10. find_junk_files - temp, cache, .DS_Store, build artifacts
+# 3. directory_disk_usage - which immediate children consume the most space?
+# 4. get_disk_usage - how much space is left on this volume?
+# 5. file_info - metadata for a single file or directory
+# 6. find_large_files - which files are bigger than a threshold?
+# 7. find_duplicate_files - are there identical files lurking around?
+# 8. find_stale_files - which files haven't been modified in a while?
+# 9. find_empty_directories - which folders would be cleaned up?
+# 10. find_junk_files - which junk files and build artifacts clutter this folder?
 # ===============================================
 
 # Read only annotation hint, because these tools do not modify the file system
@@ -84,7 +84,7 @@ JUNK_DIRECTORIES: frozenset[str] = frozenset(
 )
 
 
-# 1. explore_directory - list_directory + file_names + search_files + tree
+# 1. explore_directory - what is in this directory?
 @mcp.tool(annotations=READ_ONLY)
 async def explore_directory(
     ctx: Context,
@@ -216,7 +216,7 @@ async def count_files(ctx: Context, path: str = DEFAULT_PATH) -> CountFilesResul
         return unexpected_error("count_files", path, exc)
 
 
-# 3. directory_disk_usage - which subdirectories consume the most space?
+# 3. directory_disk_usage - which immediate children consume the most space?
 @mcp.tool(annotations=READ_ONLY)
 async def directory_disk_usage(
     ctx: Context, path: str = DEFAULT_PATH, top_n: int = 10
@@ -335,7 +335,7 @@ async def get_disk_usage(ctx: Context, path: str = DEFAULT_PATH) -> GetDiskUsage
         return unexpected_error("get_disk_usage", path, exc)
 
 
-# 5. file_info - when was this file last modified?
+# 5. file_info - metadata for a single file or directory
 @mcp.tool(annotations=READ_ONLY)
 async def file_info(ctx: Context, path: str = DEFAULT_PATH) -> FileInfoResult:
     """Get metadata about a single file or directory.
@@ -663,7 +663,7 @@ async def find_empty_directories(
         return unexpected_error("find_empty_directories", path, exc)
 
 
-# 10. find_junk_files - which junk files are cluttering this folder?
+# 10. find_junk_files - which junk files and build artifacts clutter this folder?
 @mcp.tool(annotations=READ_ONLY)
 async def find_junk_files(
     ctx: Context, path: str = DEFAULT_PATH
