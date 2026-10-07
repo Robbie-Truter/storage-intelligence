@@ -26,8 +26,17 @@ build-backend = "uv_build"
 [dependency-groups]
 dev = [
     "debugpy>=1.8.21",
+    "pyright>=1.1.414",
     "ruff>=0.16.7",
 ]
+
+[tool.pyright]
+include = ["src"]
+exclude = ["dist", "**/__pycache__"]
+pythonVersion = "3.13"
+typeCheckingMode = "basic"
+venvPath = "."
+venv = ".venv"
 
 [tool.ruff]
 target-version = "py313"
