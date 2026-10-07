@@ -1,14 +1,25 @@
+import fnmatch
 import hashlib
 import shutil
 import time
 from pathlib import Path
+from typing import Literal
 
 from fastmcp import Context
 from mcp.types import ToolAnnotations
 
 from storage_intelligence.core import mcp
 from storage_intelligence.utils import (
+    CountFilesResult,
+    DirectoryDiskUsageResult,
+    DuplicateFileGroup,
+    ExploreDirectoryResult,
+    FileInfoResult,
     FindEmptyDirectoriesResult,
+    FindJunkFilesResult,
+    GetDiskUsageResult,
+    LargeFileEntry,
+    StaleFileEntry,
     path_error,
     unexpected_error,
 )
@@ -16,19 +27,16 @@ from storage_intelligence.utils import (
 # ===============================================
 # List of storage analysis tools, in the order they are implemented:
 # ===============================================
-# 1. list_directory - what's in this folder?
+# 1. explore_directory - what is in this directory?
 # 2. count_files - how many files of each type are in this folder?
-# 3. file_names - show me all .txt files here
-# 4. directory_sizes - what's taking up space?
-# 5. search_files - find all files matching a pattern
-# 6. file_info - when was this file last modified?
-# 7. tree - show me the project structure
-# 8. get_disk_usage - how much space is left on this volume?
-# 9. directory_disk_usage - which subdirectories consume the most space?
-# 10. find_large_files - which files are bigger than a threshold?
-# 11. find_duplicate_files - are there identical files lurking around?
-# 12. find_stale_files - which files haven't been accessed in a while?
-# 13. find_empty_directories - which folders would be cleaned up?
+# 3. directory_disk_usage - which immediate children consume the most space?
+# 4. get_disk_usage - how much space is left on this volume?
+# 5. file_info - metadata for a single file or directory
+# 6. find_large_files - which files are bigger than a threshold?
+# 7. find_duplicate_files - are there identical files lurking around?
+# 8. find_stale_files - which files haven't been modified in a while?
+# 9. find_empty_directories - which folders would be cleaned up?
+# 10. find_junk_files - which junk files and build artifacts clutter this folder?
 # ===============================================
 
 # Read only annotation hint, because these tools do not modify the file system
@@ -42,38 +50,127 @@ DEFAULT_PATH = str(Path.home())
 # The exact count is reported separately and is never truncated.
 SAMPLE_LIMIT = 25
 
+# Junk-file suffixes matched by find_junk_files, compared against Path.suffix
+# in lowercased form. `.DS_Store` is handled separately by name check because
+# a leading-dot filename has no suffix in pathlib.
+JUNK_EXTENSIONS: frozenset[str] = frozenset(
+    {
+        ".log",
+        ".tmp",
+        ".temp",
+        ".cache",
+        ".backup",
+        ".bak",
+        ".old",
+        ".swp",
+        ".swo",
+        ".swn",
+        ".o",
+        ".obj",
+        ".exe",
+        ".dll",
+        ".lib",
+        ".a",
+        ".so",
+        ".out",
+    }
+)
 
-# 1. list_directory - what's in this folder?
+# Build-artifact directory names matched by find_junk_files. Compared
+# case-sensitively against top-level entry names: these are conventional
+# spellings, and a lowercase "Dist" directory is not one of them.
+JUNK_DIRECTORIES: frozenset[str] = frozenset(
+    {"node_modules", "__pycache__", "dist", "build", "target"}
+)
+
+
+# 1. explore_directory - what is in this directory?
 @mcp.tool(annotations=READ_ONLY)
-async def list_directory(ctx: Context, path: str = DEFAULT_PATH) -> str:
-    """List the immediate contents of a directory, one entry per line.
+async def explore_directory(
+    ctx: Context,
+    path: str = DEFAULT_PATH,
+    pattern: str = "",
+    search: str = "",
+    kind: Literal["all", "files", "dirs"] = "all",
+    recursive: bool = False,
+    max_results: int = 100,
+) -> ExploreDirectoryResult:
+    """List the contents of a directory as one formatted line per entry.
 
-    Non-recursive: shows only what sits directly inside `path`. Each line is
-    prefixed with a folder or file emoji. Returns "Directory is empty" when
-    there is nothing to list.
+    Each entry is prefixed with a folder or file emoji. Non-recursive (default):
+    shows only what sits directly inside `path` and names entries by their bare
+    name. Recursive: walks every depth below `path` and names entries by their
+    path relative to `path`, e.g. `src/storage_intelligence/core.py`. Empty
+    `entries` with `truncated` False means nothing matched -- an empty
+    directory and filters that exclude everything are indistinguishable.
+
+    `pattern` and `search` filter on the entry's own name, not on the relative
+    path, so `*.py` still matches `core.py` at any depth. Scanning stops at
+    `max_results`; `truncated` reports whether more matches existed, so a
+    capped list is always known to be an excerpt.
 
     Args:
         path: Absolute directory path to list. Defaults to the home directory.
+        pattern: Glob pattern matched against each entry's name, e.g. '*.py'.
+            Case sensitivity follows the platform. Empty matches every entry.
+        search: Case-insensitive substring the entry's name must contain.
+            Empty matches every entry.
+        kind: 'all' (default) lists both files and directories, 'files' only
+            files, 'dirs' only directories.
+        recursive: False (default) lists immediate children only. True descends
+            the whole tree below `path` and reports relative paths.
+        max_results: Stop after this many matching entries. Default 100.
     """
     try:
         p = Path(path)
         if not p.exists():
-            await ctx.error(f"list_directory failed: {path} does not exist")
-            return path_error("list_directory", path)
+            await ctx.error(f"explore_directory failed: {path} does not exist")
+            return path_error("explore_directory", path)
+
         await ctx.info(f"Listing directory: {path}")
-        entries = []
-        for child in sorted(p.iterdir()):
-            prefix = "📁 " if child.is_dir() else "📄 "
-            entries.append(f"{prefix}{child.name}")
-        return "\n".join(entries) if entries else "Directory is empty"
+
+        entries: list[str] = []
+        truncated = False
+
+        path_contents = p.rglob("*") if recursive else p.iterdir()
+
+        for child in path_contents:
+            child_name = child.name
+
+            if pattern and not fnmatch.fnmatch(child_name, pattern):
+                continue
+
+            if search and search.lower() not in child_name.lower():
+                continue
+
+            is_dir = child.is_dir()
+            is_file = child.is_file()
+
+            if kind == "files" and not is_file:
+                continue
+            if kind == "dirs" and not is_dir:
+                continue
+
+            # Checked before appending: reaching the cap only proves
+            # truncation when one more match actually exists, so an exact
+            # fit stays truncated=False.
+            if len(entries) >= max_results:
+                truncated = True
+                break
+
+            prefix = "📁 " if is_dir else "📄 "
+            entry_name = child.relative_to(p) if recursive else child.name
+            entries.append(f"{prefix}{entry_name}")
+
+        return {"path": str(p), "entries": entries, "truncated": truncated}
     except Exception as exc:
-        await ctx.error(f"list_directory failed: {type(exc).__name__}: {exc}")
-        return unexpected_error("list_directory", path, exc)
+        await ctx.error(f"explore_directory failed: {type(exc).__name__}: {exc}")
+        return unexpected_error("explore_directory", path, exc)
 
 
 # 2. count_files - how many files of each type are in this folder?
 @mcp.tool(annotations=READ_ONLY)
-async def count_files(ctx: Context, path: str = DEFAULT_PATH) -> dict:
+async def count_files(ctx: Context, path: str = DEFAULT_PATH) -> CountFilesResult:
     """Count files in a directory, grouped by file extension.
 
     Non-recursive: counts only files directly inside `path`. Directories and
@@ -87,260 +184,43 @@ async def count_files(ctx: Context, path: str = DEFAULT_PATH) -> dict:
     """
     try:
         p = Path(path)
+
         if not p.exists():
             await ctx.error(f"count_files failed: {path} does not exist")
             return path_error("count_files", path)
+
+        if not p.is_dir():
+            await ctx.error(f"count_files failed: {path} is not a directory")
+            return path_error("count_files", path)
+
         await ctx.info(f"Counting files in: {path}")
+
         total = 0
         by_extension: dict[str, int] = {}
+
         for child in p.iterdir():
             if child.is_file():
                 total += 1
                 ext = child.suffix.lower() or "(no extension)"
                 by_extension[ext] = by_extension.get(ext, 0) + 1
+
         return {
+            "path": str(p),
             "total_files": total,
-            "by_extension": dict(sorted(by_extension.items(), key=lambda x: -x[1])),
+            "by_extension": dict(
+                sorted(by_extension.items(), key=lambda x: (-x[1], x[0]))
+            ),
         }
     except Exception as exc:
         await ctx.error(f"count_files failed: {type(exc).__name__}: {exc}")
         return unexpected_error("count_files", path, exc)
 
 
-# 3. file_names - show me all files with a given extension here
-@mcp.tool(annotations=READ_ONLY)
-async def file_names(
-    ctx: Context, path: str = DEFAULT_PATH, extension: str = ""
-) -> list[str]:
-    """List file names in a directory, optionally filtered by extension.
-
-    Non-recursive: returns bare names for files directly inside `path`, not
-    full paths. Directories are excluded. With no `extension`, every file is
-    returned; with one, only files whose suffix matches, compared
-    case-insensitively.
-
-    Args:
-        path: Absolute directory path to inspect. Defaults to the home directory.
-        extension: Extension to filter by, including the dot (e.g. '.py').
-            Empty or omitted returns every file name.
-    """
-    try:
-        p = Path(path)
-        if not p.exists():
-            await ctx.error(f"file_names failed: {path} does not exist")
-            return path_error("file_names", path)
-        await ctx.info(
-            f"Listing file names in: {path}"
-            + (f" (extension={extension})" if extension else "")
-        )
-        if extension:
-            return [
-                f.name
-                for f in p.iterdir()
-                if f.is_file() and f.suffix.lower() == extension.lower()
-            ]
-        return [f.name for f in p.iterdir() if f.is_file()]
-    except Exception as exc:
-        await ctx.error(f"file_names failed: {type(exc).__name__}: {exc}")
-        return unexpected_error("file_names", path, exc)
-
-
-# 4. directory_sizes - what's taking up space?
-@mcp.tool(annotations=READ_ONLY)
-async def directory_sizes(ctx: Context, path: str = DEFAULT_PATH) -> list[dict]:
-    """List the immediate contents of a directory with a size per entry.
-
-    Reports files by size in human-readable form and directories by *file count*,
-    not bytes -- a directory entry is `{"files": N}`. For actual byte sizes per
-    subdirectory, use `directory_disk_usage`. Because a count ignores file size,
-    a folder of many tiny files can outrank a folder holding one large video;
-    it measures population, not weight.
-
-    Args:
-        path: Absolute directory path to inspect. Defaults to the home directory.
-    """
-    try:
-        p = Path(path)
-        if not p.exists():
-            await ctx.error(f"directory_sizes failed: {path} does not exist")
-            return path_error("directory_sizes", path)
-
-        def human_size(nbytes: int) -> str:
-            for unit in ("B", "KB", "MB", "GB", "TB"):
-                if abs(nbytes) < 1024:
-                    return f"{nbytes:.1f} {unit}"
-                nbytes /= 1024
-            return f"{nbytes:.1f} PB"
-
-        await ctx.info(f"Computing directory sizes in: {path}")
-        results = []
-        for child in sorted(p.iterdir()):
-            if child.is_file():
-                results.append(
-                    {
-                        "name": child.name,
-                        "type": "file",
-                        "size": human_size(child.stat().st_size),
-                    }
-                )
-            else:
-                file_count = sum(1 for _ in child.rglob("*") if _.is_file())
-                results.append(
-                    {"name": child.name, "type": "directory", "files": file_count}
-                )
-        return results
-    except Exception as exc:
-        await ctx.error(f"directory_sizes failed: {type(exc).__name__}: {exc}")
-        return unexpected_error("directory_sizes", path, exc)
-
-
-# 5. search_files - find all files matching a glob pattern
-@mcp.tool(annotations=READ_ONLY)
-async def search_files(
-    ctx: Context, path: str = DEFAULT_PATH, pattern: str = "*"
-) -> list[str]:
-    """Find entries in a directory matching a glob pattern.
-
-    Depth is controlled entirely by `pattern`, since glob matching is used
-    directly: `*.py` matches only in `path` itself, while `**/*.py` also
-    matches at every depth below it. Returns both files and directories that
-    match. Results are not capped, so a broad pattern over a large tree can
-    return a very long list.
-
-    Args:
-        path: Absolute directory path to search under.
-        pattern: Glob pattern relative to `path` (e.g. '*.py', '**/*.txt').
-            Defaults to '*', every entry directly inside `path`.
-    """
-    try:
-        p = Path(path)
-        if not p.exists():
-            await ctx.error(f"search_files failed: {path} does not exist")
-            return path_error("search_files", path)
-        await ctx.info(f"Searching for '{pattern}' in: {path}")
-        return sorted(str(f) for f in p.glob(pattern))
-    except Exception as exc:
-        await ctx.error(f"search_files failed: {type(exc).__name__}: {exc}")
-        return unexpected_error("search_files", path, exc)
-
-
-# 6. file_info - when was this file last modified?
-@mcp.tool(annotations=READ_ONLY)
-async def file_info(ctx: Context, path: str = DEFAULT_PATH) -> dict:
-    """Get metadata about a single file or directory.
-
-    Reports name, size, modification and creation times as Unix timestamps, and
-    whether the path is a file or a directory. Directories have a small
-    platform-dependent `size_bytes` that reflects the entry itself, not the
-    space its contents occupy.
-
-    Args:
-        path: Absolute path to the file or directory to inspect.
-    """
-    try:
-        p = Path(path)
-        if not p.exists():
-            await ctx.error(f"file_info failed: {path} does not exist")
-            return path_error("file_info", path)
-        await ctx.info(f"Getting metadata for: {path}")
-        stat = p.stat()
-        return {
-            "name": p.name,
-            "path": str(p),
-            "type": "directory" if p.is_dir() else "file",
-            "size_bytes": stat.st_size,
-            "modified": stat.st_mtime,
-            "created": stat.st_ctime,
-            "extension": p.suffix,
-        }
-    except Exception as exc:
-        await ctx.error(f"file_info failed: {type(exc).__name__}: {exc}")
-        return unexpected_error("file_info", path, exc)
-
-
-# 7. tree - show me the project structure
-@mcp.tool(annotations=READ_ONLY)
-async def tree(ctx: Context, path: str = DEFAULT_PATH, max_depth: int = 3) -> str:
-    """Show a directory tree, one entry per line with folder/file markers.
-
-    Recursion stops at `max_depth`. Output is untruncated and unbounded in
-    length, so keep `max_depth` small over a large tree -- it is a display
-    helper, not a summary. For an idea of how much space something occupies, use
-    `directory_disk_usage` instead.
-
-    Args:
-        path: Absolute directory path to render.
-        max_depth: Levels below `path` to descend. 3 (default) shows children,
-            grandchildren, and great-grandchildren.
-    """
-    try:
-        p = Path(path)
-        if not p.exists():
-            await ctx.error(f"tree failed: {path} does not exist")
-            return path_error("tree", path)
-
-        await ctx.info(f"Building directory tree for: {path} (max_depth={max_depth})")
-        lines: list[str] = []
-
-        def _walk(dir_path: Path, prefix: str, depth: int) -> None:
-            if depth >= max_depth:
-                return
-            children = sorted(dir_path.iterdir())
-            for i, child in enumerate(children):
-                connector = "└── " if i == len(children) - 1 else "├── "
-                icon = "📁 " if child.is_dir() else "📄 "
-                lines.append(f"{prefix}{connector}{icon}{child.name}")
-                if child.is_dir():
-                    extension = "    " if i == len(children) - 1 else "│   "
-                    _walk(child, prefix + extension, depth + 1)
-
-        lines.append(f"📁 {p.name}/")
-        _walk(p, "", 0)
-        return "\n".join(lines)
-    except Exception as exc:
-        await ctx.error(f"tree failed: {type(exc).__name__}: {exc}")
-        return unexpected_error("tree", path, exc)
-
-
-# 8. get_disk_usage - how much space is left on this volume?
-@mcp.tool(annotations=READ_ONLY)
-async def get_disk_usage(ctx: Context, path: str = DEFAULT_PATH) -> dict:
-    """Get total, used, and free space for the volume containing a path.
-
-    Reports the whole filesystem or volume that `path` lives on, not just `path`
-    itself. Used bytes count everything on that volume including unrelated
-    system and application data, so a free-space reading here is not
-    attributable to any one directory.
-
-    Args:
-        path: Any existing path on the volume to measure. Defaults to the home
-            directory.
-    """
-    try:
-        p = Path(path)
-        if not p.exists():
-            await ctx.error(f"get_disk_usage failed: {path} does not exist")
-            return path_error("get_disk_usage", path)
-        await ctx.info(f"Getting disk usage for: {path}")
-        total, used, free = shutil.disk_usage(p)
-        usage_percent = round(used / total * 100, 1) if total else 0.0
-        return {
-            "path": str(p),
-            "total_bytes": total,
-            "used_bytes": used,
-            "free_bytes": free,
-            "usage_percent": usage_percent,
-        }
-    except Exception as exc:
-        await ctx.error(f"get_disk_usage failed: {type(exc).__name__}: {exc}")
-        return unexpected_error("get_disk_usage", path, exc)
-
-
-# 9. directory_disk_usage - which subdirectories consume the most space?
+# 3. directory_disk_usage - which immediate children consume the most space?
 @mcp.tool(annotations=READ_ONLY)
 async def directory_disk_usage(
     ctx: Context, path: str = DEFAULT_PATH, top_n: int = 10
-) -> list[dict]:
+) -> DirectoryDiskUsageResult:
     """Find the largest immediate children of a directory, in bytes.
 
     Ranks only the direct children of `path`, though each directory's size is
@@ -349,14 +229,25 @@ async def directory_disk_usage(
     one level deep -- a directory buried three levels down is only reported if
     its parent is among the top results. Sorted largest first.
 
+    Unreadable files are skipped silently rather than reported, so a single
+    permissions problem or race cannot abort the ranking. Broken symlinks
+    and other special files (sockets, FIFOs) are skipped too -- they are
+    neither regular files nor directories, and would otherwise be ranked
+    as zero-byte directories.
+
     Args:
         path: Absolute directory path whose children should be ranked.
         top_n: How many of the largest entries to return. Default 10.
     """
     try:
         p = Path(path)
+
         if not p.exists():
             await ctx.error(f"directory_disk_usage failed: {path} does not exist")
+            return path_error("directory_disk_usage", path)
+
+        if not p.is_dir():
+            await ctx.error(f"directory_disk_usage failed: {path} is not a directory")
             return path_error("directory_disk_usage", path)
 
         def dir_size(d: Path) -> int:
@@ -370,17 +261,23 @@ async def directory_disk_usage(
             return total
 
         await ctx.info(f"Computing recursive disk usage in: {path} (top_n={top_n})")
+
         results = []
-        for child in sorted(p.iterdir()):
+
+        for child in p.iterdir():
             if child.is_file():
+                try:
+                    size_bytes = child.stat().st_size
+                except OSError:
+                    continue
                 results.append(
                     {
                         "name": child.name,
                         "type": "file",
-                        "size_bytes": child.stat().st_size,
+                        "size_bytes": size_bytes,
                     }
                 )
-            else:
+            elif child.is_dir():
                 results.append(
                     {
                         "name": child.name,
@@ -388,21 +285,106 @@ async def directory_disk_usage(
                         "size_bytes": dir_size(child),
                     }
                 )
+            else:
+                continue
         results.sort(key=lambda x: x["size_bytes"], reverse=True)
-        return results[:top_n]
+
+        return {"path": str(p), "entries": results[:top_n]}
+
     except Exception as exc:
         await ctx.error(f"directory_disk_usage failed: {type(exc).__name__}: {exc}")
         return unexpected_error("directory_disk_usage", path, exc)
 
 
-# 10. find_large_files - which files are bigger than a threshold?
+# 4. get_disk_usage - how much space is left on this volume?
+@mcp.tool(annotations=READ_ONLY)
+async def get_disk_usage(ctx: Context, path: str = DEFAULT_PATH) -> GetDiskUsageResult:
+    """Get total, used, and free space for the volume containing a path.
+
+    Reports the whole filesystem or volume that `path` lives on, not just `path`
+    itself. Used bytes count everything on that volume including unrelated
+    system and application data, so a free-space reading here is not
+    attributable to any one directory.
+
+    Args:
+        path: Any existing path on the volume to measure. Defaults to the home
+            directory.
+    """
+    try:
+        p = Path(path)
+
+        if not p.exists():
+            await ctx.error(f"get_disk_usage failed: {path} does not exist")
+            return path_error("get_disk_usage", path)
+
+        await ctx.info(f"Getting disk usage for: {path}")
+
+        total, used, free = shutil.disk_usage(p)
+        usage_percent = round(used / total * 100, 1) if total else 0.0
+
+        return {
+            "path": str(p),
+            "total_bytes": total,
+            "used_bytes": used,
+            "free_bytes": free,
+            "usage_percent": usage_percent,
+        }
+
+    except Exception as exc:
+        await ctx.error(f"get_disk_usage failed: {type(exc).__name__}: {exc}")
+        return unexpected_error("get_disk_usage", path, exc)
+
+
+# 5. file_info - metadata for a single file or directory
+@mcp.tool(annotations=READ_ONLY)
+async def file_info(ctx: Context, path: str = DEFAULT_PATH) -> FileInfoResult:
+    """Get metadata about a single file or directory.
+
+    Reports name, size, modification and creation times as Unix timestamps, and
+    whether the path is a file or a directory. Directories have a small
+    platform-dependent `size_bytes` that reflects the entry itself, not the
+    space its contents occupy.
+
+    `created` prefers the platform's birth time (macOS `st_birthtime`); where
+    none exists it falls back to `st_ctime`, which is creation time on
+    Windows but last-metadata-change time on Linux.
+
+    Args:
+        path: Absolute path to the file or directory to inspect.
+    """
+    try:
+        p = Path(path)
+        if not p.exists():
+            await ctx.error(f"file_info failed: {path} does not exist")
+            return path_error("file_info", path)
+
+        await ctx.info(f"Getting metadata for: {path}")
+
+        stat = p.stat()
+
+        return {
+            "name": p.name,
+            "path": str(p),
+            "type": "directory" if p.is_dir() else "file",
+            "size_bytes": stat.st_size,
+            "modified": stat.st_mtime,
+            "created": getattr(stat, "st_birthtime", stat.st_ctime),
+            "extension": p.suffix,
+        }
+
+    except Exception as exc:
+        await ctx.error(f"file_info failed: {type(exc).__name__}: {exc}")
+        return unexpected_error("file_info", path, exc)
+
+
+# 6. find_large_files - which files are bigger than a threshold?
 @mcp.tool(annotations=READ_ONLY)
 async def find_large_files(
     ctx: Context,
     path: str = DEFAULT_PATH,
     min_size_mb: float = 100.0,
     max_results: int = 50,
-) -> list[dict]:
+) -> list[LargeFileEntry]:
     """Find large files anywhere under a directory, largest first.
 
     Recursive. Matches on apparent file size, so a sparse file or hard link
@@ -448,11 +430,11 @@ async def find_large_files(
         return unexpected_error("find_large_files", path, exc)
 
 
-# 11. find_duplicate_files - are there identical files lurking around?
+# 7. find_duplicate_files - are there identical files lurking around?
 @mcp.tool(annotations=READ_ONLY)
 async def find_duplicate_files(
     ctx: Context, path: str = DEFAULT_PATH, min_size_bytes: int = 1024
-) -> list[dict]:
+) -> list[DuplicateFileGroup]:
     """Find groups of files with identical content, grouped by SHA-256 hash.
 
     Recursive. Two-stage for speed: files are bucketed by size first, then only
@@ -518,14 +500,14 @@ async def find_duplicate_files(
         return unexpected_error("find_duplicate_files", path, exc)
 
 
-# 12. find_stale_files - which files haven't been modified in a while?
+# 8. find_stale_files - which files haven't been modified in a while?
 @mcp.tool(annotations=READ_ONLY)
 async def find_stale_files(
     ctx: Context,
     path: str = DEFAULT_PATH,
     days_unmodified: int = 90,
     max_results: int = 100,
-) -> list[dict]:
+) -> list[StaleFileEntry]:
     """Find files not modified for a while, least recently modified first.
 
     Recursive. Ages come from modification time (`st_mtime`), not access time --
@@ -535,9 +517,10 @@ async def find_stale_files(
     file edited recently but unchanged for years still qualifies as stale.
 
     Unreadable entries are skipped silently, so a permissions problem is
-    indistinguishable from "nothing matched". Results are uncapped in count but
-    cut at `max_results`; the oldest files come first, which is usually the
-    useful end.
+    indistinguishable from "nothing matched". The scan itself is uncapped --
+    every file under `path` is examined -- but the returned list is cut at
+    `max_results`; the oldest files come first, which is usually the useful
+    end.
 
     Args:
         path: Absolute directory path to search under.
@@ -582,7 +565,7 @@ async def find_stale_files(
         return unexpected_error("find_stale_files", path, exc)
 
 
-# 13. find_empty_directories - which folders would be cleaned up?
+# 9. find_empty_directories - which folders would be cleaned up?
 @mcp.tool(annotations=READ_ONLY)
 async def find_empty_directories(
     ctx: Context, path: str = DEFAULT_PATH, recursive: bool = True
@@ -678,3 +661,88 @@ async def find_empty_directories(
     except Exception as exc:
         await ctx.error(f"find_empty_directories failed: {type(exc).__name__}: {exc}")
         return unexpected_error("find_empty_directories", path, exc)
+
+
+# 10. find_junk_files - which junk files and build artifacts clutter this folder?
+@mcp.tool(annotations=READ_ONLY)
+async def find_junk_files(
+    ctx: Context, path: str = DEFAULT_PATH
+) -> FindJunkFilesResult:
+    """Find junk files and build-artifact directories in a directory.
+
+    Junk files are identified by suffix, comparing each file's lowercased
+    suffix against a fixed list (see JUNK_EXTENSIONS): .log, .tmp, .temp,
+    .cache, .backup, .bak, .old, .swp, .swo, .swn, .o, .obj, .exe, .dll, .lib,
+    .a, .so, .out. The filename `.DS_Store` is also matched by name, since it
+    has no suffix.
+
+    Directories are matched by name instead: top-level entries called
+    `node_modules`, `__pycache__`, `dist`, `build` or `target` (see
+    JUNK_DIRECTORIES) are reported in `directories` as full paths. Names are
+    unique within one directory, so that list is never capped and is not
+    reflected in `total_files` or `by_extension`, which count files only.
+
+    Non-recursive: only direct children of `path` are inspected. Returns
+    counts plus a `sample` of matching paths capped at `SAMPLE_LIMIT`, so
+    `sample` and `directories` can both be passed straight to `trash_path`.
+    `truncated` reports whether `sample` is shorter than `total_files`.
+
+    Args:
+        path: Absolute directory path to inspect. Defaults to the home directory.
+    """
+    try:
+        p = Path(path)
+
+        if not p.exists():
+            await ctx.error(f"find_junk_files failed: {path} does not exist")
+            return path_error("find_junk_files", path)
+
+        if not p.is_dir():
+            await ctx.error(f"find_junk_files failed: {path} is not a directory")
+            return path_error("find_junk_files", path)
+
+        await ctx.info(f"Counting junk files and build directories in: {path}")
+
+        total = 0
+        by_extension: dict[str, int] = {}
+        directories: list[str] = []
+        sample: list[str] = []
+
+        for child in p.iterdir():
+            if child.is_dir():
+                if child.name in JUNK_DIRECTORIES:
+                    directories.append(str(child))
+                continue
+
+            if not child.is_file():
+                continue
+
+            suffix = child.suffix.lower()
+
+            if suffix in JUNK_EXTENSIONS:
+                ext = suffix
+            elif child.name == ".DS_Store":
+                ext = ".ds_store"
+            else:
+                continue
+
+            total += 1
+            by_extension[ext] = by_extension.get(ext, 0) + 1
+
+            if len(sample) < SAMPLE_LIMIT:
+                sample.append(str(child))
+
+        return {
+            "path": str(p),
+            "total_files": total,
+            "by_extension": dict(
+                sorted(by_extension.items(), key=lambda x: (-x[1], x[0]))
+            ),
+            "directories": sorted(directories),
+            "sample": sample,
+            "truncated": total > SAMPLE_LIMIT,
+        }
+
+    except Exception as exc:
+        await ctx.error(f"find_junk_files failed: {type(exc).__name__}: {exc}")
+        return unexpected_error("find_junk_files", path, exc)
