@@ -10,7 +10,15 @@ from mcp.types import ToolAnnotations
 
 from storage_intelligence.core import mcp
 from storage_intelligence.utils import (
+    CountFilesResult,
+    DirectoryUsageEntry,
+    DuplicateFileGroup,
+    FileInfoResult,
     FindEmptyDirectoriesResult,
+    FindJunkFilesResult,
+    GetDiskUsageResult,
+    LargeFileEntry,
+    StaleFileEntry,
     path_error,
     unexpected_error,
 )
@@ -147,7 +155,7 @@ async def explore_directory(
 
 # 2. count_files - how many files of each type are in this folder?
 @mcp.tool(annotations=READ_ONLY)
-async def count_files(ctx: Context, path: str = DEFAULT_PATH) -> dict:
+async def count_files(ctx: Context, path: str = DEFAULT_PATH) -> CountFilesResult:
     """Count files in a directory, grouped by file extension.
 
     Non-recursive: counts only files directly inside `path`. Directories and
@@ -194,7 +202,7 @@ async def count_files(ctx: Context, path: str = DEFAULT_PATH) -> dict:
 @mcp.tool(annotations=READ_ONLY)
 async def directory_disk_usage(
     ctx: Context, path: str = DEFAULT_PATH, top_n: int = 10
-) -> list[dict]:
+) -> list[DirectoryUsageEntry]:
     """Find the largest immediate children of a directory, in bytes.
 
     Ranks only the direct children of `path`, though each directory's size is
@@ -202,6 +210,9 @@ async def directory_disk_usage(
     subdirectory reflects its whole subtree, but the set of candidates is just
     one level deep -- a directory buried three levels down is only reported if
     its parent is among the top results. Sorted largest first.
+
+    Unreadable files are skipped silently rather than reported, so a single
+    permissions problem or race cannot abort the ranking.
 
     Args:
         path: Absolute directory path whose children should be ranked.
@@ -234,11 +245,15 @@ async def directory_disk_usage(
 
         for child in p.iterdir():
             if child.is_file():
+                try:
+                    size_bytes = child.stat().st_size
+                except OSError:
+                    continue
                 results.append(
                     {
                         "name": child.name,
                         "type": "file",
-                        "size_bytes": child.stat().st_size,
+                        "size_bytes": size_bytes,
                     }
                 )
             else:
@@ -258,7 +273,7 @@ async def directory_disk_usage(
 
 # 4. get_disk_usage - how much space is left on this volume?
 @mcp.tool(annotations=READ_ONLY)
-async def get_disk_usage(ctx: Context, path: str = DEFAULT_PATH) -> dict:
+async def get_disk_usage(ctx: Context, path: str = DEFAULT_PATH) -> GetDiskUsageResult:
     """Get total, used, and free space for the volume containing a path.
 
     Reports the whole filesystem or volume that `path` lives on, not just `path`
@@ -297,7 +312,7 @@ async def get_disk_usage(ctx: Context, path: str = DEFAULT_PATH) -> dict:
 
 # 5. file_info - when was this file last modified?
 @mcp.tool(annotations=READ_ONLY)
-async def file_info(ctx: Context, path: str = DEFAULT_PATH) -> dict:
+async def file_info(ctx: Context, path: str = DEFAULT_PATH) -> FileInfoResult:
     """Get metadata about a single file or directory.
 
     Reports name, size, modification and creation times as Unix timestamps, and
@@ -336,7 +351,7 @@ async def find_large_files(
     path: str = DEFAULT_PATH,
     min_size_mb: float = 100.0,
     max_results: int = 50,
-) -> list[dict]:
+) -> list[LargeFileEntry]:
     """Find large files anywhere under a directory, largest first.
 
     Recursive. Matches on apparent file size, so a sparse file or hard link
@@ -386,7 +401,7 @@ async def find_large_files(
 @mcp.tool(annotations=READ_ONLY)
 async def find_duplicate_files(
     ctx: Context, path: str = DEFAULT_PATH, min_size_bytes: int = 1024
-) -> list[dict]:
+) -> list[DuplicateFileGroup]:
     """Find groups of files with identical content, grouped by SHA-256 hash.
 
     Recursive. Two-stage for speed: files are bucketed by size first, then only
@@ -459,7 +474,7 @@ async def find_stale_files(
     path: str = DEFAULT_PATH,
     days_unmodified: int = 90,
     max_results: int = 100,
-) -> list[dict]:
+) -> list[StaleFileEntry]:
     """Find files not modified for a while, least recently modified first.
 
     Recursive. Ages come from modification time (`st_mtime`), not access time --
@@ -616,7 +631,9 @@ async def find_empty_directories(
 
 # 10. find_junk_files - which junk files are cluttering this folder?
 @mcp.tool(annotations=READ_ONLY)
-async def find_junk_files(ctx: Context, path: str = DEFAULT_PATH) -> dict:
+async def find_junk_files(
+    ctx: Context, path: str = DEFAULT_PATH
+) -> FindJunkFilesResult:
     """Find junk files in a directory, grouped by file extension.
 
     Junk files are identified by suffix, comparing each file's lowercased

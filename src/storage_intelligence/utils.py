@@ -87,6 +87,138 @@ class TrashPathResult(TypedDict):
     message: NotRequired[str]
 
 
+class CountFilesResult(TypedDict):
+    """Successful `count_files` result.
+
+    Non-recursive snapshot of the files directly inside the directory.
+
+        total_files - how many files matched, before grouping.
+        by_extension - count per lowercased extension, largest count first.
+            Files without an extension group under "(no extension)" so the
+            groups still add up to `total_files`.
+    """
+
+    total_files: int
+    by_extension: dict[str, int]
+
+
+class DirectoryUsageEntry(TypedDict):
+    """One child in the `directory_disk_usage` ranking, largest first.
+
+    name - the child's bare name, not a path.
+    type - "file" or "directory". For a directory the size covers its
+        whole subtree, not the entry itself.
+    size_bytes - apparent size: `st_size` for a file, the recursive
+        total for a directory.
+    """
+
+    name: str
+    type: Literal["file", "directory"]
+    size_bytes: int
+
+
+class GetDiskUsageResult(TypedDict):
+    """Successful `get_disk_usage` result.
+
+    Figures describe the whole volume, not the directory that was passed in.
+
+        path - the path whose volume was measured.
+        total_bytes / used_bytes / free_bytes - the raw `shutil.disk_usage`
+            figures for that volume.
+        usage_percent - used divided by total, rounded to one decimal, or
+            0.0 for a zero-size volume.
+    """
+
+    path: str
+    total_bytes: int
+    used_bytes: int
+    free_bytes: int
+    usage_percent: float
+
+
+class FileInfoResult(TypedDict):
+    """Successful `file_info` result.
+
+    name / path - the entry's bare name and absolute path.
+    type - "file" or "directory".
+    size_bytes - the entry's own size. For a directory this is the small
+        platform-dependent inode size, not its contents' total.
+    modified - `st_mtime` as a Unix timestamp.
+    created - `st_ctime` as a Unix timestamp. On POSIX this is the last
+        metadata-change time, not a true creation time.
+    extension - suffix including the dot, or "" when there is none.
+    """
+
+    name: str
+    path: str
+    type: Literal["file", "directory"]
+    size_bytes: int
+    modified: float
+    created: float
+    extension: str
+
+
+class LargeFileEntry(TypedDict):
+    """One file in the `find_large_files` listing, largest first.
+
+    path - absolute path of the file.
+    size_bytes - apparent size used against the threshold.
+    size_mb - size in mebibytes rounded to one decimal, so the reader
+        does not have to convert the raw figure itself.
+    """
+
+    path: str
+    size_bytes: int
+    size_mb: float
+
+
+class DuplicateFileGroup(TypedDict):
+    """One group of byte-identical files from `find_duplicate_files`.
+
+    size_bytes - the size every member of the group shares; groups are
+        ordered by it, largest first.
+    files - absolute paths of the identical copies, at least two. Which
+        copy to keep is a judgement call left to the caller.
+    """
+
+    size_bytes: int
+    files: list[str]
+
+
+class StaleFileEntry(TypedDict):
+    """One file in the `find_stale_files` listing, stalest first.
+
+    path - absolute path of the file.
+    size_bytes - apparent size of the file.
+    days_unmodified - days since `st_mtime`, rounded to one decimal.
+    """
+
+    path: str
+    size_bytes: int
+    days_unmodified: float
+
+
+class FindJunkFilesResult(TypedDict):
+    """Successful `find_junk_files` result.
+
+    path - the directory that was inspected (direct children only).
+    total_files - how many junk files matched; never truncated.
+    by_extension - count per matching suffix, largest count first.
+        `.DS_Store` files group under ".ds_store" because a leading-dot
+        name has no suffix to match on.
+    sample - the first matching paths, capped at SAMPLE_LIMIT so the
+        result can be handed straight to `trash_path`.
+    truncated - whether `sample` is shorter than `total_files`. Without
+        it an excerpt is indistinguishable from a complete list.
+    """
+
+    path: str
+    total_files: int
+    by_extension: dict[str, int]
+    sample: list[str]
+    truncated: bool
+
+
 def path_error(tool: str, path: str) -> ToolResult:
     """Build a structured error result for a missing path."""
     return ToolResult(
