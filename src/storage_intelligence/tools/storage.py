@@ -40,7 +40,7 @@ from storage_intelligence.utils import (
 # ===============================================
 
 # Read only annotation hint, because these tools do not modify the file system
-READ_ONLY = ToolAnnotations(readOnlyHint=True)
+READ_ONLY = ToolAnnotations(read_only_hint=True)
 
 # Home directory for the user
 DEFAULT_PATH = str(Path.home())

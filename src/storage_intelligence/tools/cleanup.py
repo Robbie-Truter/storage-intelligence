@@ -18,7 +18,7 @@ from storage_intelligence.utils import (
 # ===============================================
 
 # Destructive annotation hint because cleanup tools modify or delete files
-DESTRUCTIVE = ToolAnnotations(readOnlyHint=False, destructiveHint=True)
+DESTRUCTIVE = ToolAnnotations(read_only_hint=False, destructive_hint=True)
 
 
 # 1. trash_path - delete a specific file or directory safely

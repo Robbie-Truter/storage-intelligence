@@ -1,4 +1,4 @@
-from typing import Literal, NotRequired, TypedDict
+from typing import Any, Literal, NotRequired, TypedDict
 
 from fastmcp.tools import ToolResult
 
@@ -262,7 +262,11 @@ class FindJunkFilesResult(TypedDict):
     truncated: bool
 
 
-def path_error(tool: str, path: str) -> ToolResult:
+# `Any`, not `ToolResult`: the tools declare only their success TypedDict, so
+# returning `ToolResult` fails reportReturnType. Annotating `X | ToolResult`
+# is not an option -- FastMCP suppresses the output schema when ToolResult
+# appears anywhere in the union.
+def path_error(tool: str, path: str) -> Any:
     """Build a structured error result for a missing path."""
     return ToolResult(
         content=f"Path not found: {path}",
@@ -271,7 +275,7 @@ def path_error(tool: str, path: str) -> ToolResult:
     )
 
 
-def unexpected_error(tool: str, path: str, exc: Exception) -> ToolResult:
+def unexpected_error(tool: str, path: str, exc: Exception) -> Any:
     """Build a structured error result for any unexpected exception."""
     return ToolResult(
         content=f"{tool} failed: {type(exc).__name__}: {exc}",
