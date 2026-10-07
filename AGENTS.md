@@ -34,7 +34,7 @@ For each todo item fixed, generate a commit message based on my commit message n
 ### Docstrings, arguments, comments
 
 - [x] `find_junk_files:629` - docstring hardcodes "capped at 25" while code uses `SAMPLE_LIMIT`; reference the constant instead.
-- [ ] `trash_path:32-39` - docstring silent on dedup (:48-51) and missing-path tolerance (:53-63); both are implemented, the model needs to know before batching.
-- [ ] `find_stale_files:472-473` - "Results are uncapped in count but cut at `max_results`" is self-contradictory; means the scan is uncapped but output is cut.
-- [ ] `explore_directory:92` - honest that `max_results` truncation is silent, but `str` return leaves no room for a `truncated` flag; consider a structured return like the other tools.
+- [x] `trash_path:32-39` - docstring silent on dedup (:48-51) and missing-path tolerance (:53-63); both are implemented, the model needs to know before batching.
+- [x] `find_stale_files:472-473` - "Results are uncapped in count but cut at `max_results`" is self-contradictory; means the scan is uncapped but output is cut.
+- [x] `explore_directory:92` - honest that `max_results` truncation is silent, but `str` return leaves no room for a `truncated` flag; consider a structured return like the other tools.
 - [x] Header comment (storage.py:30) claims `find_junk_files` covers build artifacts - disagrees with docstring and code (resolve together with the validity item above).

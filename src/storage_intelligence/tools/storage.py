@@ -1,7 +1,7 @@
+import fnmatch
 import hashlib
 import shutil
 import time
-from fnmatch import fnmatch
 from pathlib import Path
 from typing import Literal
 
@@ -13,6 +13,7 @@ from storage_intelligence.utils import (
     CountFilesResult,
     DirectoryDiskUsageResult,
     DuplicateFileGroup,
+    ExploreDirectoryResult,
     FileInfoResult,
     FindEmptyDirectoriesResult,
     FindJunkFilesResult,
@@ -93,18 +94,20 @@ async def explore_directory(
     kind: Literal["all", "files", "dirs"] = "all",
     recursive: bool = False,
     max_results: int = 100,
-) -> str:
-    """List the contents of a directory, one entry per line.
+) -> ExploreDirectoryResult:
+    """List the contents of a directory as one formatted line per entry.
 
-    Each line is prefixed with a folder or file emoji. Non-recursive (default):
+    Each entry is prefixed with a folder or file emoji. Non-recursive (default):
     shows only what sits directly inside `path` and names entries by their bare
     name. Recursive: walks every depth below `path` and names entries by their
-    path relative to `path`, e.g. `src/storage_intelligence/core.py`. Returns
-    "Directory is empty" when nothing matched the filters.
+    path relative to `path`, e.g. `src/storage_intelligence/core.py`. Empty
+    `entries` with `truncated` False means nothing matched -- an empty
+    directory and filters that exclude everything are indistinguishable.
 
     `pattern` and `search` filter on the entry's own name, not on the relative
-    path, so `*.py` still matches `core.py` at any depth. Output stops at
-    `max_results` without saying so, so treat a capped list as an excerpt.
+    path, so `*.py` still matches `core.py` at any depth. Scanning stops at
+    `max_results`; `truncated` reports whether more matches existed, so a
+    capped list is always known to be an excerpt.
 
     Args:
         path: Absolute directory path to list. Defaults to the home directory.
@@ -126,7 +129,8 @@ async def explore_directory(
 
         await ctx.info(f"Listing directory: {path}")
 
-        entries = []
+        entries: list[str] = []
+        truncated = False
 
         path_contents = p.rglob("*") if recursive else p.iterdir()
 
@@ -147,14 +151,18 @@ async def explore_directory(
             if kind == "dirs" and not is_dir:
                 continue
 
+            # Checked before appending: reaching the cap only proves
+            # truncation when one more match actually exists, so an exact
+            # fit stays truncated=False.
+            if len(entries) >= max_results:
+                truncated = True
+                break
+
             prefix = "📁 " if is_dir else "📄 "
             entry_name = child.relative_to(p) if recursive else child.name
             entries.append(f"{prefix}{entry_name}")
 
-            if len(entries) >= max_results:
-                break
-
-        return "\n".join(entries) if entries else "Directory is empty"
+        return {"path": str(p), "entries": entries, "truncated": truncated}
     except Exception as exc:
         await ctx.error(f"explore_directory failed: {type(exc).__name__}: {exc}")
         return unexpected_error("explore_directory", path, exc)
@@ -509,9 +517,10 @@ async def find_stale_files(
     file edited recently but unchanged for years still qualifies as stale.
 
     Unreadable entries are skipped silently, so a permissions problem is
-    indistinguishable from "nothing matched". Results are uncapped in count but
-    cut at `max_results`; the oldest files come first, which is usually the
-    useful end.
+    indistinguishable from "nothing matched". The scan itself is uncapped --
+    every file under `path` is examined -- but the returned list is cut at
+    `max_results`; the oldest files come first, which is usually the useful
+    end.
 
     Args:
         path: Absolute directory path to search under.

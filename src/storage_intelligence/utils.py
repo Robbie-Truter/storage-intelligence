@@ -19,6 +19,26 @@ from fastmcp.tools import ToolResult
 #                        rather than a recoverable condition.
 
 
+class ExploreDirectoryResult(TypedDict):
+    """Successful `explore_directory` result.
+
+    path - the directory that was inspected.
+    entries - one formatted line per match: a folder/file emoji prefix
+        plus the bare name, or the path relative to `path` when
+        recursive, in scan order. Empty with `truncated` False means
+        nothing matched -- an empty directory and filters that exclude
+        everything are indistinguishable.
+    truncated - whether scanning stopped at `max_results` with more
+        matches still unseen. Without it a capped list passes for a
+        complete listing and the agent reports a partial tree as the
+        whole directory.
+    """
+
+    path: str
+    entries: list[str]
+    truncated: bool
+
+
 class FindEmptyDirectoriesResult(TypedDict):
     """Successful `find_empty_directories` result.
 

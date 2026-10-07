@@ -31,6 +31,12 @@ async def trash_path(
     Accepts a single path or a list. Directories are trashed whole. Targets are
     trashed deepest path first so nested path reporting stays accurate.
 
+    Batching does not need pre-validation. Duplicate entries are collapsed, so
+    the same path listed twice trashes once instead of failing the second
+    attempt. Missing paths are tolerated in a mixed batch: each is reported in
+    `missing_paths` and logged as a warning while the rest proceed; only an
+    all-missing batch fails, with `error: path_not_found`.
+
     Args:
         path: A single file/directory path string or a list of path strings.
         confirm: False (default) returns a dry-run preview. True executes deletion.
