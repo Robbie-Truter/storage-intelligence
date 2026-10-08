@@ -38,6 +38,9 @@ jobs:
       - name: Pyright Type Check
         run: uv run pyright
 
+      - name: Pytest
+        run: uv run pytest
+
       - name: Build Package
         run: uv build
 
