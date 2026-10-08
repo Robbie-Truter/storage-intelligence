@@ -12,7 +12,9 @@
 - **Package Manager**: Use `uv` for environment and dependency management.
 - **Linter & Formatter**: Code must adhere to Ruff standards (`py313` target, 88 line length).
 - **Type Checker**: Use Pyright (`basic` mode, configured in `pyproject.toml` under `[tool.pyright]`). All code must pass type checking.
+- **Testing**: Use Pytest for tests (run with `uv run pytest`); all existing tests must keep passing.
 - **Verification Commands** (run all before considering a task complete):
   - `uv run ruff check --fix`
   - `uv run ruff format`
   - `uv run pyright`
+  - `uv run pytest`
