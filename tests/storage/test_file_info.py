@@ -10,6 +10,7 @@ from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
+from fastmcp.exceptions import ToolError
 
 from storage_intelligence.tools.storage import file_info
 
@@ -149,18 +150,12 @@ async def test_file_without_extension_returns_empty_string(
 
 
 @pytest.mark.anyio
-async def test_missing_path_returns_path_error(ctx: AsyncMock, tmp_path: Path) -> None:
+async def test_missing_path_raises_tool_error(ctx: AsyncMock, tmp_path: Path) -> None:
     missing = str(tmp_path / "does-not-exist")
 
-    result: Any = await file_info(ctx, path=missing)
+    with pytest.raises(ToolError, match="Path not found"):
+        await file_info(ctx, path=missing)
 
-    assert result.is_error is True
-    assert result.structured_content == {
-        "error": "path_not_found",
-        "tool": "file_info",
-        "path": missing,
-    }
-    assert "Path not found" in result.content[0].text
     ctx.error.assert_awaited_once()
 
 
@@ -178,11 +173,9 @@ async def test_unexpected_error_when_stat_raises(
 
     monkeypatch.setattr(Path, "stat", boom)
 
-    result: Any = await file_info(ctx, path=str(tree / "note.txt"))
+    with pytest.raises(RuntimeError, match="boom"):
+        await file_info(ctx, path=str(tree / "note.txt"))
 
-    assert result.is_error is True
-    assert result.structured_content["error"] == "unexpected_error"
-    assert result.structured_content["exception_type"] == "RuntimeError"
     assert "RuntimeError" in ctx.error.await_args.args[0]
 
 

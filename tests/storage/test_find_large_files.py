@@ -9,6 +9,7 @@ from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
+from fastmcp.exceptions import ToolError
 
 from storage_intelligence.tools.storage import find_large_files
 
@@ -148,7 +149,7 @@ async def test_unreadable_file_skipped(
     def stat(self: Path, *args: Any, **kwargs: Any) -> Any:
         # Path.is_file() stats the child before the tool's own try block, so
         # only raise for the tool's direct child.stat() call (storage.py:416);
-        # raising for is_file() would surface as unexpected_error instead.
+        # raising for is_file() would otherwise abort the whole scan.
         caller = sys._getframe(1).f_code.co_name
         if self.name == "big.bin" and caller == "find_large_files":
             raise OSError("permission denied")
@@ -170,18 +171,12 @@ async def test_unreadable_file_skipped(
 
 
 @pytest.mark.anyio
-async def test_missing_path_returns_path_error(ctx: AsyncMock, tmp_path: Path) -> None:
+async def test_missing_path_raises_tool_error(ctx: AsyncMock, tmp_path: Path) -> None:
     missing = str(tmp_path / "does-not-exist")
 
-    result: Any = await find_large_files(ctx, path=missing)
+    with pytest.raises(ToolError, match="Path not found"):
+        await find_large_files(ctx, path=missing)
 
-    assert result.is_error is True
-    assert result.structured_content == {
-        "error": "path_not_found",
-        "tool": "find_large_files",
-        "path": missing,
-    }
-    assert "Path not found" in result.content[0].text
     ctx.error.assert_awaited_once()
 
 
@@ -199,11 +194,9 @@ async def test_unexpected_error_when_rglob_raises(
 
     monkeypatch.setattr(Path, "rglob", boom)
 
-    result: Any = await find_large_files(ctx, path=str(tree), min_size_mb=1.0)
+    with pytest.raises(RuntimeError, match="boom"):
+        await find_large_files(ctx, path=str(tree), min_size_mb=1.0)
 
-    assert result.is_error is True
-    assert result.structured_content["error"] == "unexpected_error"
-    assert result.structured_content["exception_type"] == "RuntimeError"
     assert "RuntimeError" in ctx.error.await_args.args[0]
 
 

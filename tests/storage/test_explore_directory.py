@@ -8,6 +8,7 @@ from typing import Any, Literal
 from unittest.mock import AsyncMock
 
 import pytest
+from fastmcp.exceptions import ToolError
 
 from storage_intelligence.tools.storage import explore_directory
 
@@ -203,18 +204,12 @@ async def test_filters_excluding_everything_return_empty(
 
 
 @pytest.mark.anyio
-async def test_missing_path_returns_path_error(ctx: AsyncMock, tmp_path: Path) -> None:
+async def test_missing_path_raises_tool_error(ctx: AsyncMock, tmp_path: Path) -> None:
     missing = str(tmp_path / "does-not-exist")
 
-    result: Any = await explore_directory(ctx, path=missing)
+    with pytest.raises(ToolError, match="Path not found"):
+        await explore_directory(ctx, path=missing)
 
-    assert result.is_error is True
-    assert result.structured_content == {
-        "error": "path_not_found",
-        "tool": "explore_directory",
-        "path": missing,
-    }
-    assert "Path not found" in result.content[0].text
     ctx.error.assert_awaited_once()
 
 
@@ -232,11 +227,9 @@ async def test_unexpected_error_when_path_check_raises(
 
     monkeypatch.setattr(Path, "exists", boom)
 
-    result: Any = await explore_directory(ctx, path=str(tree))
+    with pytest.raises(RuntimeError, match="boom"):
+        await explore_directory(ctx, path=str(tree))
 
-    assert result.is_error is True
-    assert result.structured_content["error"] == "unexpected_error"
-    assert result.structured_content["exception_type"] == "RuntimeError"
     assert "RuntimeError" in ctx.error.await_args.args[0]
 
 

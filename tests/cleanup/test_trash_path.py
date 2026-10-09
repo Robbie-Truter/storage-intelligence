@@ -8,6 +8,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, call
 
 import pytest
+from fastmcp.exceptions import ToolError
 
 from storage_intelligence.tools import cleanup
 from storage_intelligence.tools.cleanup import trash_path
@@ -115,14 +116,10 @@ async def test_path_and_paths_are_combined(
 
 
 @pytest.mark.anyio
-async def test_no_targets_returns_unexpected_error(
-    ctx: AsyncMock, trash: MagicMock
-) -> None:
-    result: Any = await trash_path(ctx)
+async def test_no_targets_raises_tool_error(ctx: AsyncMock, trash: MagicMock) -> None:
+    with pytest.raises(ToolError, match="No paths given"):
+        await trash_path(ctx)
 
-    assert result.is_error is True
-    assert result.structured_content["error"] == "unexpected_error"
-    assert result.structured_content["exception_type"] == "ValueError"
     ctx.error.assert_awaited_once()
     trash.assert_not_called()
 
@@ -171,16 +168,14 @@ async def test_mixed_batch_reports_missing_and_trashes_rest(
 
 
 @pytest.mark.anyio
-async def test_all_missing_returns_path_error(
+async def test_all_missing_raises_tool_error(
     ctx: AsyncMock, tree: Path, trash: MagicMock
 ) -> None:
     missing = [str(tree / "a.txt"), str(tree / "b.txt")]
 
-    result: Any = await trash_path(ctx, paths=missing, confirm=True)
+    with pytest.raises(ToolError, match="Path not found"):
+        await trash_path(ctx, paths=missing, confirm=True)
 
-    assert result.is_error is True
-    assert result.structured_content["error"] == "path_not_found"
-    assert result.structured_content["path"] == ", ".join(missing)
     ctx.error.assert_awaited_once()
     trash.assert_not_called()
 
@@ -191,14 +186,10 @@ async def test_all_missing_returns_path_error(
 
 
 @pytest.mark.anyio
-async def test_empty_list_returns_unexpected_error(
-    ctx: AsyncMock, trash: MagicMock
-) -> None:
-    result: Any = await trash_path(ctx, paths=[])
+async def test_empty_list_raises_tool_error(ctx: AsyncMock, trash: MagicMock) -> None:
+    with pytest.raises(ToolError, match="No paths given"):
+        await trash_path(ctx, paths=[])
 
-    assert result.is_error is True
-    assert result.structured_content["error"] == "unexpected_error"
-    assert result.structured_content["exception_type"] == "ValueError"
     ctx.error.assert_awaited_once()
     trash.assert_not_called()
 
@@ -318,11 +309,9 @@ async def test_unexpected_error_when_exists_raises(
 
     monkeypatch.setattr(Path, "exists", boom)
 
-    result: Any = await trash_path(ctx, str(tree / "top.txt"))
+    with pytest.raises(RuntimeError, match="boom"):
+        await trash_path(ctx, str(tree / "top.txt"))
 
-    assert result.is_error is True
-    assert result.structured_content["error"] == "unexpected_error"
-    assert result.structured_content["exception_type"] == "RuntimeError"
     ctx.error.assert_awaited_once()
     trash.assert_not_called()
 
