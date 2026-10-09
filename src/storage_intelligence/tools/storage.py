@@ -13,6 +13,7 @@ from storage_intelligence.utils import (
     CountFilesResult,
     DirectoryDiskUsageResult,
     DuplicateFileGroup,
+    ExploreDirectoryEntry,
     ExploreDirectoryResult,
     FileInfoResult,
     FindEmptyDirectoriesResult,
@@ -95,17 +96,18 @@ async def explore_directory(
     recursive: bool = False,
     max_results: int = 100,
 ) -> ExploreDirectoryResult:
-    """List the contents of a directory as one formatted line per entry.
+    """List the contents of a directory as one structured record per entry.
 
-    Each entry is prefixed with a folder or file emoji. Non-recursive (default):
-    shows only what sits directly inside `path` and names entries by their bare
-    name. Recursive: walks every depth below `path` and names entries by their
-    path relative to `path`, e.g. `src/storage_intelligence/core.py`. Empty
-    `entries` with `truncated` False means nothing matched -- an empty
-    directory and filters that exclude everything are indistinguishable.
+    Each entry carries its bare `name`, its full `path`, and a `type` label
+    prefixed with a folder or file emoji. Non-recursive (default): shows only
+    what sits directly inside `path`. Recursive: walks every depth below
+    `path`, so entries report full paths at any depth, e.g.
+    `/home/user/proj/src/storage_intelligence/core.py`. Empty `entries` with
+    `truncated` False means nothing matched -- an empty directory and filters
+    that exclude everything are indistinguishable.
 
-    `pattern` and `search` filter on the entry's own name, not on the relative
-    path, so `*.py` still matches `core.py` at any depth. Scanning stops at
+    `pattern` and `search` filter on the entry's own name, not on its path,
+    so `*.py` still matches `core.py` at any depth. Scanning stops at
     `max_results`; `truncated` reports whether more matches existed, so a
     capped list is always known to be an excerpt.
 
@@ -118,7 +120,7 @@ async def explore_directory(
         kind: 'all' (default) lists both files and directories, 'files' only
             files, 'dirs' only directories.
         recursive: False (default) lists immediate children only. True descends
-            the whole tree below `path` and reports relative paths.
+            the whole tree below `path` and reports entries at any depth.
         max_results: Stop after this many matching entries. Default 100.
     """
     try:
@@ -129,7 +131,7 @@ async def explore_directory(
 
         await ctx.info(f"Listing directory: {path}")
 
-        entries: list[str] = []
+        entries: list[ExploreDirectoryEntry] = []
         truncated = False
 
         path_contents = p.rglob("*") if recursive else p.iterdir()
@@ -158,9 +160,15 @@ async def explore_directory(
                 truncated = True
                 break
 
-            prefix = "📁 " if is_dir else "📄 "
+            prefix = "directory " if is_dir else "file "
             entry_name = child.relative_to(p) if recursive else child.name
-            entries.append(f"{prefix}{entry_name}")
+            entries.append(
+                {
+                    "name": child.name,
+                    "path": str(p / entry_name),
+                    "type": prefix,
+                }
+            )
 
         return {"path": str(p), "entries": entries, "truncated": truncated}
     except Exception as exc:

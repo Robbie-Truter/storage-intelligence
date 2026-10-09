@@ -13,4 +13,4 @@ inspect-prompts:
 	npx @modelcontextprotocol/inspector --cli uv run storage-intelligence --method prompts/list
 
 test:
-	pytest tests/storage
+	pytest tests/storage -vv

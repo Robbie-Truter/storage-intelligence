@@ -19,15 +19,33 @@ from fastmcp.tools import ToolResult
 #                        rather than a recoverable condition.
 
 
+class ExploreDirectoryEntry(TypedDict):
+    """One match from `explore_directory`, in scan order.
+
+    name - the entry's bare name, always just the filename.
+    path - the entry's full path. Non-recursive this is `path` (the
+        inspected directory) joined with `name`; recursive it descends
+        to the entry at any depth, so the agent can act on it directly
+        (e.g. pass it to `file_info` or `trash_path`) without having to
+        reconstruct the relative path itself.
+    type - a prefixed label: "📁 Directory " or "📄 File ". Not a bare
+        type enum -- the prefix is what gets rendered, so the leading
+        emoji and trailing space are part of the value.
+    """
+
+    name: str
+    path: str
+    type: str
+
+
 class ExploreDirectoryResult(TypedDict):
     """Successful `explore_directory` result.
 
     path - the directory that was inspected.
-    entries - one formatted line per match: a folder/file emoji prefix
-        plus the bare name, or the path relative to `path` when
-        recursive, in scan order. Empty with `truncated` False means
-        nothing matched -- an empty directory and filters that exclude
-        everything are indistinguishable.
+    entries - one structured record per match (see
+        `ExploreDirectoryEntry`), in scan order. Empty with `truncated`
+        False means nothing matched -- an empty directory and filters
+        that exclude everything are indistinguishable.
     truncated - whether scanning stopped at `max_results` with more
         matches still unseen. Without it a capped list passes for a
         complete listing and the agent reports a partial tree as the
@@ -35,7 +53,7 @@ class ExploreDirectoryResult(TypedDict):
     """
 
     path: str
-    entries: list[str]
+    entries: list[ExploreDirectoryEntry]
     truncated: bool
 
 
