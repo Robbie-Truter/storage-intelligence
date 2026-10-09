@@ -83,21 +83,48 @@ async def test_execute_single_file(
 
 
 # ===============================================
-# 4. str vs [str] equivalence
+# 4. `path` and `paths` equivalence
 # ===============================================
 
 
 @pytest.mark.anyio
-async def test_str_and_list_input_give_identical_results(
+async def test_path_and_paths_give_identical_results(
     ctx: AsyncMock, tree: Path, trash: MagicMock
 ) -> None:
     target = str(tree / "top.txt")
 
-    as_str: Any = await trash_path(ctx, target, confirm=True)
-    as_list: Any = await trash_path(ctx, [target], confirm=True)
+    single: Any = await trash_path(ctx, target, confirm=True)
+    batch: Any = await trash_path(ctx, paths=[target], confirm=True)
 
-    assert as_str == as_list
+    assert single == batch
     assert trash.call_count == 2
+
+
+@pytest.mark.anyio
+async def test_path_and_paths_are_combined(
+    ctx: AsyncMock, tree: Path, trash: MagicMock
+) -> None:
+    first = str(tree / "top.txt")
+    second = str(tree / "sub" / "nested.txt")
+
+    result: Any = await trash_path(ctx, first, paths=[second], confirm=True)
+
+    assert sorted(result["paths"]) == sorted([first, second])
+    assert result["total_valid_paths"] == 2
+    assert trash.call_count == 2
+
+
+@pytest.mark.anyio
+async def test_no_targets_returns_unexpected_error(
+    ctx: AsyncMock, trash: MagicMock
+) -> None:
+    result: Any = await trash_path(ctx)
+
+    assert result.is_error is True
+    assert result.structured_content["error"] == "unexpected_error"
+    assert result.structured_content["exception_type"] == "ValueError"
+    ctx.error.assert_awaited_once()
+    trash.assert_not_called()
 
 
 # ===============================================
@@ -111,7 +138,7 @@ async def test_duplicate_path_collapses_to_one_target(
 ) -> None:
     target = str(tree / "top.txt")
 
-    result: Any = await trash_path(ctx, [target, target], confirm=True)
+    result: Any = await trash_path(ctx, paths=[target, target], confirm=True)
 
     assert result["paths"] == [target]
     assert result["total_valid_paths"] == 1
@@ -130,7 +157,7 @@ async def test_mixed_batch_reports_missing_and_trashes_rest(
     existing = str(tree / "top.txt")
     missing = str(tree / "gone.txt")
 
-    result: Any = await trash_path(ctx, [existing, missing], confirm=True)
+    result: Any = await trash_path(ctx, paths=[existing, missing], confirm=True)
 
     assert result["missing_paths"] == [missing]
     assert result["paths"] == [existing]
@@ -149,7 +176,7 @@ async def test_all_missing_returns_path_error(
 ) -> None:
     missing = [str(tree / "a.txt"), str(tree / "b.txt")]
 
-    result: Any = await trash_path(ctx, missing, confirm=True)
+    result: Any = await trash_path(ctx, paths=missing, confirm=True)
 
     assert result.is_error is True
     assert result.structured_content["error"] == "path_not_found"
@@ -167,7 +194,7 @@ async def test_all_missing_returns_path_error(
 async def test_empty_list_returns_unexpected_error(
     ctx: AsyncMock, trash: MagicMock
 ) -> None:
-    result: Any = await trash_path(ctx, [])
+    result: Any = await trash_path(ctx, paths=[])
 
     assert result.is_error is True
     assert result.structured_content["error"] == "unexpected_error"
@@ -189,7 +216,7 @@ async def test_paths_ordered_deepest_first_and_trash_call_order_matches(
     nested = str(tree / "sub" / "nested.txt")
     top = str(tree / "top.txt")
 
-    result: Any = await trash_path(ctx, [top, deep, nested], confirm=True)
+    result: Any = await trash_path(ctx, paths=[top, deep, nested], confirm=True)
 
     assert result["paths"] == [deep, nested, top]
     assert [c.args[0] for c in trash.call_args_list] == [deep, nested, top]
@@ -204,7 +231,7 @@ async def test_equal_depth_tie_broken_alphabetically(
     first = str(tree / "a.txt")
     second = str(tree / "b.txt")
 
-    result: Any = await trash_path(ctx, [second, first], confirm=True)
+    result: Any = await trash_path(ctx, paths=[second, first], confirm=True)
 
     assert result["paths"] == [first, second]
 
@@ -244,7 +271,7 @@ async def test_partial_failure_partition_and_logging(
 
     trash.side_effect = fail_one
 
-    result: Any = await trash_path(ctx, [good, bad], confirm=True)
+    result: Any = await trash_path(ctx, paths=[good, bad], confirm=True)
 
     assert result["deleted"] == [good]
     assert result["failed"] == [
@@ -270,8 +297,8 @@ async def test_total_valid_paths_matches_paths_in_both_modes(
         str(tree / "sub" / "deep" / "deeper.txt"),
     ]
 
-    preview: Any = await trash_path(ctx, paths)
-    executed: Any = await trash_path(ctx, paths, confirm=True)
+    preview: Any = await trash_path(ctx, paths=paths)
+    executed: Any = await trash_path(ctx, paths=paths, confirm=True)
 
     assert preview["total_valid_paths"] == len(preview["paths"])
     assert executed["total_valid_paths"] == len(executed["paths"])
@@ -312,7 +339,7 @@ async def test_warning_message_includes_ignored_path_count(
     existing = str(tree / "top.txt")
     missing = [str(tree / "gone1.txt"), str(tree / "gone2.txt")]
 
-    await trash_path(ctx, [existing, *missing], confirm=True)
+    await trash_path(ctx, paths=[existing, *missing], confirm=True)
 
     ctx.warning.assert_awaited_once()
     warning = ctx.warning.await_args.args[0]

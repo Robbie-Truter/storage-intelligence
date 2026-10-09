@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from pathlib import Path
 
 from fastmcp import Context
@@ -24,11 +25,17 @@ DESTRUCTIVE = ToolAnnotations(read_only_hint=False, destructive_hint=True)
 # 1. trash_path - delete a specific file or directory safely
 @mcp.tool(annotations=DESTRUCTIVE)
 async def trash_path(
-    ctx: Context, path: str | list[str], confirm: bool = False
+    ctx: Context,
+    path: str = "",
+    paths: Sequence[str] = (),
+    confirm: bool = False,
 ) -> TrashPathResult:
     """Send one or more files or directories to the trash.
 
-    Accepts a single path or a list. Directories are trashed whole. Targets are
+    Targets arrive through two optional inputs rather than one union-typed
+    parameter: `path` takes a single path, `paths` takes a list. Give one or
+    the other, or both -- they are combined and then deduplicated. At least
+    one target is required. Directories are trashed whole. Targets are
     trashed deepest path first so nested path reporting stays accurate.
 
     Batching does not need pre-validation. Duplicate entries are collapsed, so
@@ -38,11 +45,13 @@ async def trash_path(
     all-missing batch fails, with `error: path_not_found`.
 
     Args:
-        path: A single file/directory path string or a list of path strings.
+        path: A single file/directory path string. Empty means "no single
+            target" and is ignored when `paths` is also given.
+        paths: A list of file/directory path strings. Empty means "no batch".
         confirm: False (default) returns a dry-run preview. True executes deletion.
     """
     try:
-        targets = [path] if isinstance(path, str) else list(path)
+        targets = ([path] if path else []) + list(paths)
 
         if not targets:
             await ctx.error("trash_path failed: no paths given")
@@ -102,6 +111,4 @@ async def trash_path(
 
     except Exception as exc:
         await ctx.error(f"trash_path failed: {type(exc).__name__}: {exc}")
-        return unexpected_error(
-            "trash_path", path if isinstance(path, str) else ", ".join(path), exc
-        )
+        return unexpected_error("trash_path", path or ", ".join(paths), exc)
