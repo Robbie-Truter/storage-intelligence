@@ -21,8 +21,8 @@ from storage_intelligence.utils import (
     GetDiskUsageResult,
     LargeFileEntry,
     StaleFileEntry,
+    not_a_directory_error,
     path_error,
-    unexpected_error,
 )
 
 # ===============================================
@@ -126,8 +126,10 @@ async def explore_directory(
     try:
         p = Path(path)
         if not p.exists():
-            await ctx.error(f"explore_directory failed: {path} does not exist")
-            return path_error("explore_directory", path)
+            raise path_error(path)
+
+        if not p.is_dir():
+            raise not_a_directory_error(path)
 
         await ctx.info(f"Listing directory: {path}")
 
@@ -173,7 +175,7 @@ async def explore_directory(
         return {"path": str(p), "entries": entries, "truncated": truncated}
     except Exception as exc:
         await ctx.error(f"explore_directory failed: {type(exc).__name__}: {exc}")
-        return unexpected_error("explore_directory", path, exc)
+        raise
 
 
 # 2. count_files - how many files of each type are in this folder?
@@ -194,12 +196,10 @@ async def count_files(ctx: Context, path: str = DEFAULT_PATH) -> CountFilesResul
         p = Path(path)
 
         if not p.exists():
-            await ctx.error(f"count_files failed: {path} does not exist")
-            return path_error("count_files", path)
+            raise path_error(path)
 
         if not p.is_dir():
-            await ctx.error(f"count_files failed: {path} is not a directory")
-            return path_error("count_files", path)
+            raise not_a_directory_error(path)
 
         await ctx.info(f"Counting files in: {path}")
 
@@ -221,7 +221,7 @@ async def count_files(ctx: Context, path: str = DEFAULT_PATH) -> CountFilesResul
         }
     except Exception as exc:
         await ctx.error(f"count_files failed: {type(exc).__name__}: {exc}")
-        return unexpected_error("count_files", path, exc)
+        raise
 
 
 # 3. directory_disk_usage - which immediate children consume the most space?
@@ -251,12 +251,10 @@ async def directory_disk_usage(
         p = Path(path)
 
         if not p.exists():
-            await ctx.error(f"directory_disk_usage failed: {path} does not exist")
-            return path_error("directory_disk_usage", path)
+            raise path_error(path)
 
         if not p.is_dir():
-            await ctx.error(f"directory_disk_usage failed: {path} is not a directory")
-            return path_error("directory_disk_usage", path)
+            raise not_a_directory_error(path)
 
         def dir_size(d: Path) -> int:
             total = 0
@@ -301,7 +299,7 @@ async def directory_disk_usage(
 
     except Exception as exc:
         await ctx.error(f"directory_disk_usage failed: {type(exc).__name__}: {exc}")
-        return unexpected_error("directory_disk_usage", path, exc)
+        raise
 
 
 # 4. get_disk_usage - how much space is left on this volume?
@@ -322,8 +320,7 @@ async def get_disk_usage(ctx: Context, path: str = DEFAULT_PATH) -> GetDiskUsage
         p = Path(path)
 
         if not p.exists():
-            await ctx.error(f"get_disk_usage failed: {path} does not exist")
-            return path_error("get_disk_usage", path)
+            raise path_error(path)
 
         await ctx.info(f"Getting disk usage for: {path}")
 
@@ -340,7 +337,7 @@ async def get_disk_usage(ctx: Context, path: str = DEFAULT_PATH) -> GetDiskUsage
 
     except Exception as exc:
         await ctx.error(f"get_disk_usage failed: {type(exc).__name__}: {exc}")
-        return unexpected_error("get_disk_usage", path, exc)
+        raise
 
 
 # 5. file_info - metadata for a single file or directory
@@ -363,8 +360,7 @@ async def file_info(ctx: Context, path: str = DEFAULT_PATH) -> FileInfoResult:
     try:
         p = Path(path)
         if not p.exists():
-            await ctx.error(f"file_info failed: {path} does not exist")
-            return path_error("file_info", path)
+            raise path_error(path)
 
         await ctx.info(f"Getting metadata for: {path}")
 
@@ -382,7 +378,7 @@ async def file_info(ctx: Context, path: str = DEFAULT_PATH) -> FileInfoResult:
 
     except Exception as exc:
         await ctx.error(f"file_info failed: {type(exc).__name__}: {exc}")
-        return unexpected_error("file_info", path, exc)
+        raise
 
 
 # 6. find_large_files - which files are bigger than a threshold?
@@ -408,8 +404,7 @@ async def find_large_files(
     try:
         p = Path(path)
         if not p.exists():
-            await ctx.error(f"find_large_files failed: {path} does not exist")
-            return path_error("find_large_files", path)
+            raise path_error(path)
         await ctx.info(
             f"Searching for files > {min_size_mb} MB in: {path} "
             f"(max_results={max_results})"
@@ -435,7 +430,7 @@ async def find_large_files(
         return results[:max_results]
     except Exception as exc:
         await ctx.error(f"find_large_files failed: {type(exc).__name__}: {exc}")
-        return unexpected_error("find_large_files", path, exc)
+        raise
 
 
 # 7. find_duplicate_files - are there identical files lurking around?
@@ -463,8 +458,7 @@ async def find_duplicate_files(
     try:
         p = Path(path)
         if not p.exists():
-            await ctx.error(f"find_duplicate_files failed: {path} does not exist")
-            return path_error("find_duplicate_files", path)
+            raise path_error(path)
         await ctx.info(
             f"Scanning for duplicates in: {path} (min_size_bytes={min_size_bytes})"
         )
@@ -505,7 +499,7 @@ async def find_duplicate_files(
         ]
     except Exception as exc:
         await ctx.error(f"find_duplicate_files failed: {type(exc).__name__}: {exc}")
-        return unexpected_error("find_duplicate_files", path, exc)
+        raise
 
 
 # 8. find_stale_files - which files haven't been modified in a while?
@@ -538,8 +532,8 @@ async def find_stale_files(
     try:
         p = Path(path)
         if not p.exists():
-            await ctx.error(f"find_stale_files failed: {path} does not exist")
-            return path_error("find_stale_files", path)
+            raise path_error(path)
+
         await ctx.info(
             f"Scanning for stale files in: {path} (days_unmodified={days_unmodified})"
         )
@@ -570,7 +564,7 @@ async def find_stale_files(
         return stale_files[:max_results]
     except Exception as exc:
         await ctx.error(f"find_stale_files failed: {type(exc).__name__}: {exc}")
-        return unexpected_error("find_stale_files", path, exc)
+        raise
 
 
 # 9. find_empty_directories - which folders would be cleaned up?
@@ -607,11 +601,9 @@ async def find_empty_directories(
     try:
         p = Path(path)
         if not p.exists():
-            await ctx.error(f"find_empty_directories failed: {path} does not exist")
-            return path_error("find_empty_directories", path)
+            raise path_error(path)
         if not p.is_dir():
-            await ctx.error(f"find_empty_directories failed: {path} is not a directory")
-            return path_error("find_empty_directories", path)
+            raise not_a_directory_error(path)
 
         if recursive:
             subdirs = sorted(
@@ -668,7 +660,7 @@ async def find_empty_directories(
         }
     except Exception as exc:
         await ctx.error(f"find_empty_directories failed: {type(exc).__name__}: {exc}")
-        return unexpected_error("find_empty_directories", path, exc)
+        raise
 
 
 # 10. find_junk_files - which junk files and build artifacts clutter this folder?
@@ -702,12 +694,10 @@ async def find_junk_files(
         p = Path(path)
 
         if not p.exists():
-            await ctx.error(f"find_junk_files failed: {path} does not exist")
-            return path_error("find_junk_files", path)
+            raise path_error(path)
 
         if not p.is_dir():
-            await ctx.error(f"find_junk_files failed: {path} is not a directory")
-            return path_error("find_junk_files", path)
+            raise not_a_directory_error(path)
 
         await ctx.info(f"Counting junk files and build directories in: {path}")
 
@@ -753,4 +743,4 @@ async def find_junk_files(
 
     except Exception as exc:
         await ctx.error(f"find_junk_files failed: {type(exc).__name__}: {exc}")
-        return unexpected_error("find_junk_files", path, exc)
+        raise

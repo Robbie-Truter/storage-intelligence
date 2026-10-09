@@ -1,22 +1,30 @@
-from typing import Any, Literal, NotRequired, TypedDict
+from typing import Literal, NotRequired, TypedDict
 
-from fastmcp.tools import ToolResult
+from fastmcp.exceptions import ToolError
 
 # Shared response shapes for the storage tools.
 #
 # Success is described by a TypedDict, because FastMCP derives the tool's
-# advertised output schema from the return annotation. An annotation of
-# `dict | str | ToolResult` yields NO output schema at all: any `ToolResult`
-# member suppresses the entire union, so the model is told nothing about the
-# response shape. Errors are the opposite case -- they stay `ToolResult`, and
-# `convert_result()` passes those through before any schema coercion, so the
-# annotation only needs to describe the success path.
+# advertised output schema from the return annotation, so the annotation only
+# needs to describe the success path. Errors are raised as `ToolError`, which
+# FastMCP turns into a `CallToolResult` with `is_error=True` and no
+# `structured_content`.
 #
-#   path_error()       - predictable, recoverable failures (e.g. missing path).
-#                        The AI can diagnose and try an alternative.
-#   unexpected_error() - genuine faults / unexpected exceptions (permissions,
-#                        invalid types, filesystem issues). Signals a real defect
-#                        rather than a recoverable condition.
+# The missing `structured_content` is deliberate. A structured error payload
+# would be validated against the success output schema by strict MCP clients,
+# which check `structured_content` whenever it is present and ignore
+# `isError` -- an asymmetric client-side bug, not a server one. The result is
+# an opaque -32602 that hides the real error. Error results carry text only;
+# `ToolError` messages also stay unmasked when `mask_error_details` is set.
+#
+#   path_error()            - a missing path (predictable, recoverable).
+#   not_a_directory_error() - a path that exists but is not a directory.
+#
+# Errors are not converted here. Each tool uses a single `except Exception`
+# handler that logs via `ctx.error` and re-raises with a bare `raise`. FastMCP
+# then records a traceback for genuine faults and still returns an `is_error`
+# result, while a re-raised `ToolError` stays a `FastMCPError` and is never
+# masked.
 
 
 class ExploreDirectoryEntry(TypedDict):
@@ -280,29 +288,11 @@ class FindJunkFilesResult(TypedDict):
     truncated: bool
 
 
-# `Any`, not `ToolResult`: the tools declare only their success TypedDict, so
-# returning `ToolResult` fails reportReturnType. Annotating `X | ToolResult`
-# is not an option -- FastMCP suppresses the output schema when ToolResult
-# appears anywhere in the union.
-def path_error(tool: str, path: str) -> Any:
-    """Build a structured error result for a missing path."""
-    return ToolResult(
-        content=f"Path not found: {path}",
-        structured_content={"error": "path_not_found", "tool": tool, "path": path},
-        is_error=True,
-    )
+def path_error(path: str) -> ToolError:
+    """Build a `ToolError` for a missing path."""
+    return ToolError(f"Path not found: {path}")
 
 
-def unexpected_error(tool: str, path: str, exc: Exception) -> Any:
-    """Build a structured error result for any unexpected exception."""
-    return ToolResult(
-        content=f"{tool} failed: {type(exc).__name__}: {exc}",
-        structured_content={
-            "error": "unexpected_error",
-            "tool": tool,
-            "path": path,
-            "exception_type": type(exc).__name__,
-            "message": str(exc),
-        },
-        is_error=True,
-    )
+def not_a_directory_error(path: str) -> ToolError:
+    """Build a `ToolError` for a path that exists but is not a directory."""
+    return ToolError(f"Not a directory: {path}")
