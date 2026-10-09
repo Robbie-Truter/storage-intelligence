@@ -10,6 +10,7 @@ from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
+from fastmcp.exceptions import ToolError
 
 from storage_intelligence.tools.storage import find_stale_files
 
@@ -226,7 +227,7 @@ async def test_unreadable_file_skipped_silently(
     def fake_stat(self: Path, **kwargs: Any) -> Any:
         # Path.is_file() stats the child before the tool's own try block, so
         # only raise for the tool's direct child.stat() call; raising for
-        # is_file() would surface as unexpected_error instead.
+        # is_file() would otherwise abort the whole scan.
         caller = sys._getframe(1).f_code.co_name
         if self == bad and caller == "find_stale_files":
             raise OSError("permission denied")
@@ -245,18 +246,12 @@ async def test_unreadable_file_skipped_silently(
 
 
 @pytest.mark.anyio
-async def test_missing_path_returns_path_error(ctx: AsyncMock, tmp_path: Path) -> None:
+async def test_missing_path_raises_tool_error(ctx: AsyncMock, tmp_path: Path) -> None:
     missing = str(tmp_path / "missing")
 
-    result: Any = await find_stale_files(ctx, path=missing)
+    with pytest.raises(ToolError, match="Path not found"):
+        await find_stale_files(ctx, path=missing)
 
-    assert result.is_error is True
-    assert result.structured_content == {
-        "error": "path_not_found",
-        "tool": "find_stale_files",
-        "path": missing,
-    }
-    assert "Path not found" in result.content[0].text
     ctx.error.assert_awaited_once()
 
 

@@ -4,10 +4,11 @@ Implements plans/explore_directory.md.
 """
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 from unittest.mock import AsyncMock
 
 import pytest
+from fastmcp.exceptions import ToolError
 
 from storage_intelligence.tools.storage import explore_directory
 
@@ -47,6 +48,18 @@ def many_files(tmp_path: Path) -> Path:
     return d
 
 
+def entry(root: Path, rel: str, kind: Literal["file", "directory"]) -> dict[str, str]:
+    """Build the expected `ExploreDirectoryEntry` for `rel` under `root`."""
+    name = Path(rel).name
+    label = "directory " if kind == "directory" else "file "
+    return {"name": name, "path": str(root / rel), "type": label}
+
+
+def sorted_entries(entries: list[dict[str, str]]) -> list[dict[str, str]]:
+    """Sort entries by path so assertions are order-independent."""
+    return sorted(entries, key=lambda e: e["path"])
+
+
 # ===============================================
 # 2. Happy path: non-recursive default
 # ===============================================
@@ -57,12 +70,12 @@ async def test_happy_path_non_recursive_default(ctx: AsyncMock, tree: Path) -> N
     result: Any = await explore_directory(ctx, path=str(tree))
 
     assert result["path"] == str(tree)
-    # Scan order is filesystem-defined; assert the exact set of lines.
-    assert sorted(result["entries"]) == [
-        "📁 emptydir",
-        "📁 sub",
-        "📄 root.log",
-        "📄 root.txt",
+    # Scan order is filesystem-defined; assert the exact set of entries.
+    assert sorted_entries(result["entries"]) == [
+        entry(tree, "emptydir", "directory"),
+        entry(tree, "root.log", "file"),
+        entry(tree, "root.txt", "file"),
+        entry(tree, "sub", "directory"),
     ]
     assert result["truncated"] is False
 
@@ -76,7 +89,10 @@ async def test_happy_path_non_recursive_default(ctx: AsyncMock, tree: Path) -> N
 async def test_kind_files_lists_only_files(ctx: AsyncMock, tree: Path) -> None:
     result: Any = await explore_directory(ctx, path=str(tree), kind="files")
 
-    assert sorted(result["entries"]) == ["📄 root.log", "📄 root.txt"]
+    assert sorted_entries(result["entries"]) == [
+        entry(tree, "root.log", "file"),
+        entry(tree, "root.txt", "file"),
+    ]
     assert result["truncated"] is False
 
 
@@ -84,7 +100,10 @@ async def test_kind_files_lists_only_files(ctx: AsyncMock, tree: Path) -> None:
 async def test_kind_dirs_lists_only_directories(ctx: AsyncMock, tree: Path) -> None:
     result: Any = await explore_directory(ctx, path=str(tree), kind="dirs")
 
-    assert sorted(result["entries"]) == ["📁 emptydir", "📁 sub"]
+    assert sorted_entries(result["entries"]) == [
+        entry(tree, "emptydir", "directory"),
+        entry(tree, "sub", "directory"),
+    ]
     assert result["truncated"] is False
 
 
@@ -101,7 +120,7 @@ async def test_pattern_matches_own_name_at_any_depth(
         ctx, path=str(tree), pattern="*.py", recursive=True
     )
 
-    assert result["entries"] == ["📄 sub/deep/c.py"]
+    assert result["entries"] == [entry(tree, "sub/deep/c.py", "file")]
     assert result["truncated"] is False
 
 
@@ -109,29 +128,35 @@ async def test_pattern_matches_own_name_at_any_depth(
 async def test_search_is_case_insensitive_substring(ctx: AsyncMock, tree: Path) -> None:
     result: Any = await explore_directory(ctx, path=str(tree), search="ROOT")
 
-    assert sorted(result["entries"]) == ["📄 root.log", "📄 root.txt"]
+    assert sorted_entries(result["entries"]) == [
+        entry(tree, "root.log", "file"),
+        entry(tree, "root.txt", "file"),
+    ]
     assert result["truncated"] is False
 
 
 # ===============================================
-# 5. recursive uses relative paths
+# 5. recursive uses full paths at any depth
 # ===============================================
 
 
 @pytest.mark.anyio
-async def test_recursive_reports_paths_relative_to_root(
-    ctx: AsyncMock, tree: Path
-) -> None:
+async def test_recursive_reports_full_paths(ctx: AsyncMock, tree: Path) -> None:
     result: Any = await explore_directory(ctx, path=str(tree), recursive=True)
 
-    entries = result["entries"]
-    assert "📄 sub/b.txt" in entries
-    assert "📄 sub/deep/c.py" in entries
-    assert "📁 sub" in entries
-    assert "📁 sub/deep" in entries
-    # Bare names are the non-recursive form only.
-    assert "📄 b.txt" not in entries
-    assert "📄 c.py" not in entries
+    assert sorted_entries(result["entries"]) == [
+        entry(tree, "emptydir", "directory"),
+        entry(tree, "root.log", "file"),
+        entry(tree, "root.txt", "file"),
+        entry(tree, "sub", "directory"),
+        entry(tree, "sub/b.txt", "file"),
+        entry(tree, "sub/deep", "directory"),
+        entry(tree, "sub/deep/c.py", "file"),
+    ]
+    # `name` stays the bare filename even when the entry sits at depth.
+    names = {e["name"] for e in result["entries"]}
+    assert "b.txt" in names
+    assert "c.py" in names
     assert result["truncated"] is False
 
 
@@ -179,18 +204,12 @@ async def test_filters_excluding_everything_return_empty(
 
 
 @pytest.mark.anyio
-async def test_missing_path_returns_path_error(ctx: AsyncMock, tmp_path: Path) -> None:
+async def test_missing_path_raises_tool_error(ctx: AsyncMock, tmp_path: Path) -> None:
     missing = str(tmp_path / "does-not-exist")
 
-    result: Any = await explore_directory(ctx, path=missing)
+    with pytest.raises(ToolError, match="Path not found"):
+        await explore_directory(ctx, path=missing)
 
-    assert result.is_error is True
-    assert result.structured_content == {
-        "error": "path_not_found",
-        "tool": "explore_directory",
-        "path": missing,
-    }
-    assert "Path not found" in result.content[0].text
     ctx.error.assert_awaited_once()
 
 
@@ -208,11 +227,9 @@ async def test_unexpected_error_when_path_check_raises(
 
     monkeypatch.setattr(Path, "exists", boom)
 
-    result: Any = await explore_directory(ctx, path=str(tree))
+    with pytest.raises(RuntimeError, match="boom"):
+        await explore_directory(ctx, path=str(tree))
 
-    assert result.is_error is True
-    assert result.structured_content["error"] == "unexpected_error"
-    assert result.structured_content["exception_type"] == "RuntimeError"
     assert "RuntimeError" in ctx.error.await_args.args[0]
 
 

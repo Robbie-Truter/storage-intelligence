@@ -10,6 +10,7 @@ from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
+from fastmcp.exceptions import ToolError
 
 from storage_intelligence.tools.storage import get_disk_usage
 
@@ -128,15 +129,10 @@ async def test_missing_path_returns_path_error(
     monkeypatch.setattr(shutil, "disk_usage", spy)
 
     missing = str(tmp_path / "does-not-exist")
-    result: Any = await get_disk_usage(ctx, path=missing)
 
-    assert result.is_error is True
-    assert result.structured_content == {
-        "error": "path_not_found",
-        "tool": "get_disk_usage",
-        "path": missing,
-    }
-    assert "Path not found" in result.content[0].text
+    with pytest.raises(ToolError, match="Path not found"):
+        await get_disk_usage(ctx, path=missing)
+
     ctx.error.assert_awaited_once()
     # Checked before disk_usage is consulted.
     assert calls == []
@@ -148,7 +144,7 @@ async def test_missing_path_returns_path_error(
 
 
 @pytest.mark.anyio
-async def test_disk_usage_failure_returns_unexpected_error(
+async def test_disk_usage_failure_propagates(
     ctx: AsyncMock, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     def boom(*_args: Any) -> Usage:
@@ -156,12 +152,9 @@ async def test_disk_usage_failure_returns_unexpected_error(
 
     monkeypatch.setattr(shutil, "disk_usage", boom)
 
-    result: Any = await get_disk_usage(ctx, path=str(tmp_path))
+    with pytest.raises(OSError, match="device unavailable"):
+        await get_disk_usage(ctx, path=str(tmp_path))
 
-    assert result.is_error is True
-    assert result.structured_content["error"] == "unexpected_error"
-    assert result.structured_content["exception_type"] == "OSError"
-    assert "OSError" in result.content[0].text
     ctx.error.assert_awaited_once()
 
 

@@ -8,6 +8,7 @@ from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
+from fastmcp.exceptions import ToolError
 
 from storage_intelligence.tools.storage import count_files
 
@@ -129,18 +130,12 @@ async def test_empty_directory_returns_zero_and_empty_groups(
 
 
 @pytest.mark.anyio
-async def test_missing_path_returns_path_error(ctx: AsyncMock, tmp_path: Path) -> None:
+async def test_missing_path_raises_tool_error(ctx: AsyncMock, tmp_path: Path) -> None:
     missing = str(tmp_path / "does-not-exist")
 
-    result: Any = await count_files(ctx, path=missing)
+    with pytest.raises(ToolError, match="Path not found"):
+        await count_files(ctx, path=missing)
 
-    assert result.is_error is True
-    assert result.structured_content == {
-        "error": "path_not_found",
-        "tool": "count_files",
-        "path": missing,
-    }
-    assert "Path not found" in result.content[0].text
     ctx.error.assert_awaited_once()
 
 
@@ -150,20 +145,15 @@ async def test_missing_path_returns_path_error(ctx: AsyncMock, tmp_path: Path) -
 
 
 @pytest.mark.anyio
-async def test_file_path_returns_path_error(ctx: AsyncMock, tmp_path: Path) -> None:
+async def test_file_path_raises_not_a_directory(ctx: AsyncMock, tmp_path: Path) -> None:
     file_path = tmp_path / "not-a-dir.txt"
     file_path.write_text("x")
 
-    result: Any = await count_files(ctx, path=str(file_path))
+    with pytest.raises(ToolError, match="Not a directory"):
+        await count_files(ctx, path=str(file_path))
 
-    assert result.is_error is True
-    assert result.structured_content == {
-        "error": "path_not_found",
-        "tool": "count_files",
-        "path": str(file_path),
-    }
     ctx.error.assert_awaited_once()
-    assert "not a directory" in ctx.error.await_args.args[0]
+    assert "Not a directory" in ctx.error.await_args.args[0]
 
 
 # ===============================================
@@ -180,11 +170,9 @@ async def test_unexpected_error_when_iterdir_raises(
 
     monkeypatch.setattr(Path, "iterdir", boom)
 
-    result: Any = await count_files(ctx, path=str(tree))
+    with pytest.raises(RuntimeError, match="boom"):
+        await count_files(ctx, path=str(tree))
 
-    assert result.is_error is True
-    assert result.structured_content["error"] == "unexpected_error"
-    assert result.structured_content["exception_type"] == "RuntimeError"
     assert "RuntimeError" in ctx.error.await_args.args[0]
 
 

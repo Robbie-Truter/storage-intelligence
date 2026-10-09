@@ -1,6 +1,8 @@
+from collections.abc import Sequence
 from pathlib import Path
 
 from fastmcp import Context
+from fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from send2trash import send2trash
 
@@ -8,7 +10,6 @@ from storage_intelligence.core import mcp
 from storage_intelligence.utils import (
     TrashPathResult,
     path_error,
-    unexpected_error,
 )
 
 # ===============================================
@@ -24,29 +25,36 @@ DESTRUCTIVE = ToolAnnotations(read_only_hint=False, destructive_hint=True)
 # 1. trash_path - delete a specific file or directory safely
 @mcp.tool(annotations=DESTRUCTIVE)
 async def trash_path(
-    ctx: Context, path: str | list[str], confirm: bool = False
+    ctx: Context,
+    path: str = "",
+    paths: Sequence[str] = (),
+    confirm: bool = False,
 ) -> TrashPathResult:
     """Send one or more files or directories to the trash.
 
-    Accepts a single path or a list. Directories are trashed whole. Targets are
+    Targets arrive through two optional inputs rather than one union-typed
+    parameter: `path` takes a single path, `paths` takes a list. Give one or
+    the other, or both -- they are combined and then deduplicated. At least
+    one target is required. Directories are trashed whole. Targets are
     trashed deepest path first so nested path reporting stays accurate.
 
     Batching does not need pre-validation. Duplicate entries are collapsed, so
     the same path listed twice trashes once instead of failing the second
     attempt. Missing paths are tolerated in a mixed batch: each is reported in
     `missing_paths` and logged as a warning while the rest proceed; only an
-    all-missing batch fails, with `error: path_not_found`.
+    all-missing batch fails, as a not-found error.
 
     Args:
-        path: A single file/directory path string or a list of path strings.
+        path: A single file/directory path string. Empty means "no single
+            target" and is ignored when `paths` is also given.
+        paths: A list of file/directory path strings. Empty means "no batch".
         confirm: False (default) returns a dry-run preview. True executes deletion.
     """
     try:
-        targets = [path] if isinstance(path, str) else list(path)
+        targets = ([path] if path else []) + list(paths)
 
         if not targets:
-            await ctx.error("trash_path failed: no paths given")
-            return unexpected_error("trash_path", "", ValueError("no paths given"))
+            raise ToolError("No paths given")
 
         # Deduplicate: the same path listed twice would trash once and then fail
         # as missing, which reads like an error but is just redundant input.
@@ -57,8 +65,7 @@ async def trash_path(
         missing = [p for p in unique if not Path(p).exists()]
 
         if missing and not existing:
-            await ctx.error(f"trash_path failed: paths do not exist: {missing}")
-            return path_error("trash_path", ", ".join(missing))
+            raise path_error(", ".join(missing))
 
         if missing:
             await ctx.warning(
@@ -102,6 +109,4 @@ async def trash_path(
 
     except Exception as exc:
         await ctx.error(f"trash_path failed: {type(exc).__name__}: {exc}")
-        return unexpected_error(
-            "trash_path", path if isinstance(path, str) else ", ".join(path), exc
-        )
+        raise
