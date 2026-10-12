@@ -1,0 +1,9 @@
+{
+  "venvPath": ".",
+  "venv": "mcp-server/.venv",
+  "extraPaths": ["mcp-server/src"],
+  "include": ["mcp-server/src", "mcp-server/tests"],
+  "exclude": ["mcp-server/dist", "**/__pycache__"],
+  "pythonVersion": "3.13",
+  "typeCheckingMode": "basic"
+}

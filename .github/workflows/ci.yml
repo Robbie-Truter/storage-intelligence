@@ -16,6 +16,10 @@ jobs:
     name: Lint, Format, Type Check & Test
     runs-on: ubuntu-latest
 
+    defaults:
+      run:
+        working-directory: mcp-server
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -24,6 +28,7 @@ jobs:
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
+          cache-dependency-glob: mcp-server/uv.lock
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install dependencies

@@ -5,7 +5,7 @@ description: Best practices for authoring, updating, and documenting FastMCP too
 
 # FastMCP Tool Development Guide
 
-This skill provides patterns and standards for building tools in `src/storage_intelligence/tools/`.
+This skill provides patterns and standards for building tools in `mcp-server/src/storage_intelligence/tools/`.
 
 ## 1. Tool Function Structure
 
