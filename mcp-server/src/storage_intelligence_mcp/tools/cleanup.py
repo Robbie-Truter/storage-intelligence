@@ -6,8 +6,8 @@ from fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from send2trash import send2trash
 
-from storage_intelligence.core import mcp
-from storage_intelligence.utils import (
+from storage_intelligence_mcp.core import mcp
+from storage_intelligence_mcp.utils import (
     TrashPathResult,
     path_error,
 )

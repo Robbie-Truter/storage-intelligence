@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from storage_intelligence.core import mcp
+from storage_intelligence_mcp.core import mcp
 
 # ===============================================
 # List of storage cleanup prompts, in the order they are implemented:

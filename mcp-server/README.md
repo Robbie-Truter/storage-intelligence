@@ -73,7 +73,7 @@ Features:
 ### Directory Structure
 
 ```
-src/storage_intelligence/
+src/storage_intelligence_mcp/
 ├── __init__.py         # Package entry marker
 ├── core.py             # FastMCP instance configuration
 ├── server.py           # Entry point wiring tools, resources, and prompts

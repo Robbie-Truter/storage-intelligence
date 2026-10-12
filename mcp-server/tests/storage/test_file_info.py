@@ -1,4 +1,4 @@
-"""Tests for file_info (src/storage_intelligence/tools/storage.py:340).
+"""Tests for file_info (src/storage_intelligence_mcp/tools/storage.py:340).
 
 Implements plans/file_info.md.
 """
@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock
 import pytest
 from fastmcp.exceptions import ToolError
 
-from storage_intelligence.tools.storage import file_info
+from storage_intelligence_mcp.tools.storage import file_info
 
 # Known byte content for note.txt, used for size_bytes assertions.
 CONTENT = "hello file info"

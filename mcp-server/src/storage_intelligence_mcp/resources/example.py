@@ -1,4 +1,4 @@
-from storage_intelligence.core import mcp
+from storage_intelligence_mcp.core import mcp
 
 
 @mcp.resource("info://server")

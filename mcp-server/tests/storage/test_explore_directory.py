@@ -1,4 +1,4 @@
-"""Tests for explore_directory (src/storage_intelligence/tools/storage.py:89).
+"""Tests for explore_directory (src/storage_intelligence_mcp/tools/storage.py:89).
 
 Implements plans/explore_directory.md.
 """
@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock
 import pytest
 from fastmcp.exceptions import ToolError
 
-from storage_intelligence.tools.storage import explore_directory
+from storage_intelligence_mcp.tools.storage import explore_directory
 
 # ===============================================
 # Fixtures

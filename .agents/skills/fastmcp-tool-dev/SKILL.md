@@ -5,7 +5,7 @@ description: Best practices for authoring, updating, and documenting FastMCP too
 
 # FastMCP Tool Development Guide
 
-This skill provides patterns and standards for building tools in `mcp-server/src/storage_intelligence/tools/`.
+This skill provides patterns and standards for building tools in `mcp-server/src/storage_intelligence_mcp/tools/`.
 
 ## 1. Tool Function Structure
 
@@ -14,7 +14,7 @@ Every tool function exposed via FastMCP should follow this pattern:
 ```python
 from fastmcp import Context, FastMCP
 
-from storage_intelligence.utils import path_error
+from storage_intelligence_mcp.utils import path_error
 
 
 @mcp.tool()

@@ -8,8 +8,8 @@ from typing import Literal
 from fastmcp import Context
 from mcp.types import ToolAnnotations
 
-from storage_intelligence.core import mcp
-from storage_intelligence.utils import (
+from storage_intelligence_mcp.core import mcp
+from storage_intelligence_mcp.utils import (
     CountFilesResult,
     DirectoryDiskUsageResult,
     DuplicateFileGroup,
@@ -102,7 +102,7 @@ async def explore_directory(
     prefixed with a folder or file emoji. Non-recursive (default): shows only
     what sits directly inside `path`. Recursive: walks every depth below
     `path`, so entries report full paths at any depth, e.g.
-    `/home/user/proj/src/storage_intelligence/core.py`. Empty `entries` with
+    `/home/user/proj/src/storage_intelligence_mcp/core.py`. Empty `entries` with
     `truncated` False means nothing matched -- an empty directory and filters
     that exclude everything are indistinguishable.
 

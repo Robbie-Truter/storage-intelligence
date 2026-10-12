@@ -4,7 +4,7 @@ Scaffold only: the MCP client is wired into the lifespan in a later milestone.
 For now the state is initialised to ``None`` so readiness can report it.
 """
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -16,7 +16,7 @@ from .routers import agent, cleanup, disk, health
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Initialise and tear down shared resources."""
     app.state.mcp = None
     yield

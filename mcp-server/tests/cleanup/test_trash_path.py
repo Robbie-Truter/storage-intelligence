@@ -1,4 +1,4 @@
-"""Tests for trash_path (src/storage_intelligence/tools/cleanup.py:26).
+"""Tests for trash_path (src/storage_intelligence_mcp/tools/cleanup.py:26).
 
 Implements plans/trash_path.md.
 """
@@ -10,8 +10,8 @@ from unittest.mock import AsyncMock, MagicMock, call
 import pytest
 from fastmcp.exceptions import ToolError
 
-from storage_intelligence.tools import cleanup
-from storage_intelligence.tools.cleanup import trash_path
+from storage_intelligence_mcp.tools import cleanup
+from storage_intelligence_mcp.tools.cleanup import trash_path
 
 # ===============================================
 # Fixtures

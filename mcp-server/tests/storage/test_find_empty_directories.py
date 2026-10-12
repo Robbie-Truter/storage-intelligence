@@ -1,4 +1,4 @@
-"""Tests for find_empty_directories (src/storage_intelligence/tools/storage.py:570).
+"""Tests for find_empty_directories (src/storage_intelligence_mcp/tools/storage.py:570).
 
 Implements plans/find_empty_directories.md.
 """
@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock
 import pytest
 from fastmcp.exceptions import ToolError
 
-from storage_intelligence.tools.storage import find_empty_directories
+from storage_intelligence_mcp.tools.storage import find_empty_directories
 
 # ===============================================
 # Fixtures

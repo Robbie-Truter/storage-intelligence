@@ -1,4 +1,4 @@
-"""Tests for get_disk_usage (src/storage_intelligence/tools/storage.py:301).
+"""Tests for get_disk_usage (src/storage_intelligence_mcp/tools/storage.py:301).
 
 Implements plans/get_disk_usage.md.
 """
@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock
 import pytest
 from fastmcp.exceptions import ToolError
 
-from storage_intelligence.tools.storage import get_disk_usage
+from storage_intelligence_mcp.tools.storage import get_disk_usage
 
 # shutil.disk_usage returns a named 3-tuple; the tool only reads
 # .total/.used/.free, so a local stand-in is enough for mocking.

@@ -5,7 +5,7 @@ description: Playbook for safely testing and verifying file deletion, send2trash
 
 # Safe Cleanup & Testing Playbook
 
-When developing or modifying tools that delete or trash files (such as `trash_path` in `mcp-server/src/storage_intelligence/tools/cleanup.py`), strictly adhere to these safety and testing guidelines.
+When developing or modifying tools that delete or trash files (such as `trash_path` in `mcp-server/src/storage_intelligence_mcp/tools/cleanup.py`), strictly adhere to these safety and testing guidelines.
 
 ## 1. Safety Principles
 
@@ -23,7 +23,7 @@ Example test pattern:
 ```python
 import pytest
 from pathlib import Path
-from storage_intelligence.tools.cleanup import trash_path
+from storage_intelligence_mcp.tools.cleanup import trash_path
 
 
 @pytest.mark.asyncio

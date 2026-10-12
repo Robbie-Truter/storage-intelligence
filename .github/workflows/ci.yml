@@ -56,7 +56,7 @@ jobs:
 
       - name: Test Server Import (mcp-server)
         if: matrix.package == 'mcp-server'
-        run: uv run python -c "from storage_intelligence.server import mcp; print('Server loads OK')"
+        run: uv run python -c "from storage_intelligence_mcp.server import mcp; print('Server loads OK')"
 
       - name: Test App Import (backend)
         if: matrix.package == 'backend'

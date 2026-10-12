@@ -1,4 +1,4 @@
-"""Tests for find_junk_files (src/storage_intelligence/tools/storage.py:668).
+"""Tests for find_junk_files (src/storage_intelligence_mcp/tools/storage.py:668).
 
 Implements plans/find_junk_files.md.
 """
@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock
 import pytest
 from fastmcp.exceptions import ToolError
 
-from storage_intelligence.tools.storage import find_junk_files
+from storage_intelligence_mcp.tools.storage import find_junk_files
 
 # ===============================================
 # Fixtures
