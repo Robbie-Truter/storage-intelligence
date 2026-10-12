@@ -188,10 +188,6 @@ loaded automatically; `.env.example` committed and `.env` gitignored.
 
 ## CI & root tooling
 
-- Intended CI evolution: initially CI checks `mcp-server`; add `backend` to CI as soon as its scaffold and
-  checks are ready; add frontend checks when the frontend project is ready. Pull requests targeting
-  `refactor/monorepo` run the relevant checks, and the final integration into `main` must verify the complete
-  project.
 - Convert `.github/workflows/ci.yml` to a matrix over `[mcp-server, backend]`, `working-directory:
 ${{ matrix.package }}`, `cache-dependency-glob: ${{ matrix.package }}/uv.lock`; backend also runs an import
   smoke test. Run each project's type checker from its own directory against its own venv.
