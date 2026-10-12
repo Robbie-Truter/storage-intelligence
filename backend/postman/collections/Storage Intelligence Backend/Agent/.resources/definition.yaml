@@ -1,0 +1,7 @@
+$kind: collection
+name: Agent
+description: |-
+  LLM-driven agent endpoints (read-only tools only).
+  Uses LangChain; provider API keys are kept server-side.
+  Planned endpoint (added in a later milestone): POST /api/agent/analyze.
+order: 3000

@@ -1,0 +1,12 @@
+$kind: collection
+name: Storage Intelligence Backend
+description: |-
+  FastAPI service that exposes an HTTP API for the Storage Intelligence frontend.
+  Talks to the Storage Intelligence MCP server and uses LangChain for the optional
+  read-only analysis agent.
+
+  Base URL: http://127.0.0.1:8000 (local development)
+variables:
+  - key: base_url
+    value: 'http://127.0.0.1:8000'
+    description: Base URL for the Storage Intelligence Backend API

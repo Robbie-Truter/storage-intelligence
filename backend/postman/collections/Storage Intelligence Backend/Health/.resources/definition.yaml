@@ -1,0 +1,8 @@
+$kind: collection
+description: |-
+  Liveness and readiness probes.
+
+  - GET /health — cheap liveness check, no MCP dependency.
+      
+  - GET /health/ready — readiness check; returns 503 when the MCP server is  
+      unavailable so a temporarily dead MCP does not look like a dead backend.

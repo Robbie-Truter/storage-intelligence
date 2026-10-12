@@ -1,0 +1,13 @@
+$kind: http-request
+order: 1000
+method: POST
+url: '{{base_url}}/api/agent/analyze'
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "prompt": ""
+    }

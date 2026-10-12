@@ -1,0 +1,14 @@
+$kind: http-request
+order: 2000
+method: POST
+url: '{{base_url}}/api/cleanup/execute'
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "preview_id": "",
+      "confirm": true
+    }
