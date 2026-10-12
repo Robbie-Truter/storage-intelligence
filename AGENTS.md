@@ -11,6 +11,41 @@ This repository is a monorepo. The root holds:
 
 All Python commands below run from the `mcp-server/` directory.
 
+## Git branching and merge policy
+
+Intended workflow:
+
+```text
+main
+└── refactor/monorepo
+    ├── feature/backend
+    └── feature/frontend
+```
+
+This diagram represents the intended workflow, not permanent Git ancestry. Each feature branch is created from
+the latest `refactor/monorepo` and merged back through a pull request.
+
+- Use `refactor/monorepo` as the integration branch during the current monorepo development phase.
+- Create `feature/backend` from `refactor/monorepo` for backend work.
+- Create `feature/frontend` from the updated `refactor/monorepo` for frontend work.
+- Frontend development may use mocked API responses while the backend API contract is being developed.
+- Target `refactor/monorepo` for feature pull requests.
+- Do not merge into `main` until backend and frontend are complete, integrated, and verified, and the user
+  explicitly approves the merge.
+- Never merge into `main` or initiate a PR targeting `main` without explicit user approval.
+- Feature-branch commits and pushes are permitted. Do not rewrite shared branch history or force-push without
+  explicit authorization.
+- Check `git status` and the current branch before switching branches or making changes. Preserve uncommitted
+  user work.
+- Prefer one branch per major workstream rather than a separate branch for every small task.
+- Pull requests should run relevant CI checks.
+- After the monorepo work is complete, return to the normal workflow of creating feature branches from `main`,
+  unless the user specifies otherwise.
+
+Intended CI evolution: initially CI checks `mcp-server`; add `backend` to CI as soon as its scaffold and checks
+are ready; add frontend checks when the frontend project is ready. Pull requests targeting `refactor/monorepo`
+run the relevant checks, and the final integration into `main` must verify the complete project.
+
 ## Core Principles
 
 1. **Safety First**: Any destructive action or tool (e.g., file deletion, trashing, disk cleanup) must default to dry-run mode (`confirm=False`).
