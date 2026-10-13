@@ -10,6 +10,13 @@ from storage_intelligence_backend.main import create_app
 
 @pytest.fixture
 def client() -> Iterator[TestClient]:
-    """A TestClient whose lifespan has run."""
-    with TestClient(create_app()) as test_client:
-        yield test_client
+    """A ``TestClient`` for unit tests that does not run the lifespan.
+
+    Without entering the context manager the startup hooks are skipped, so the
+    real MCP subprocess is never spawned and ``app.state.mcp`` stays unset
+    (readiness reports unavailable). Integration tests exercise the real
+    lifespan separately.
+    """
+    app = create_app()
+    app.state.mcp = None
+    yield TestClient(app)

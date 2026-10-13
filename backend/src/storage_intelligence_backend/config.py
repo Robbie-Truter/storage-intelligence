@@ -3,9 +3,13 @@
 """
 
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# backend/src/storage_intelligence_backend/config.py -> repository root.
+_REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 class Settings(BaseSettings):
@@ -22,17 +26,13 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # MCP server connection.
-    mcp_server_dir: str = "mcp-server"
-    mcp_server_command: str = "uv"
-    mcp_server_args: list[str] = Field(
-        default_factory=lambda: [
-            "run",
-            "--directory",
-            "mcp-server",
-            "storage-intelligence",
-        ]
-    )
+    # MCP server connection. ``UvStdioTransport`` runs
+    # ``uv run --directory <mcp_server_dir> <mcp_server_command> <args>``, so the
+    # command is the server's console script, not ``uv`` itself. The default is
+    # resolved to an absolute path so the launch working directory is irrelevant.
+    mcp_server_dir: str = str(_REPO_ROOT / "mcp-server")
+    mcp_server_command: str = "storage-intelligence"
+    mcp_server_args: list[str] = Field(default_factory=list)
     mcp_required: bool = False
 
     # Agent / LLM.

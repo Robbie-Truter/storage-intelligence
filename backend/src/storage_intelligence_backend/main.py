@@ -1,9 +1,11 @@
 """FastAPI application factory and entry point.
 
-Scaffold only: the MCP client is wired into the lifespan in a later milestone.
-For now the state is initialised to ``None`` so readiness can report it.
+The MCP server connection is opened on startup and closed on shutdown; when it
+cannot be reached the app starts in a degraded mode (readiness reports it) unless
+``mcp_required`` is set.
 """
 
+import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -12,15 +14,38 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import __version__
 from .config import get_settings
+from .mcp.manager import StorageMCPClient
 from .routers import agent, cleanup, disk, health
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
-    """Initialise and tear down shared resources."""
-    app.state.mcp = None
-    yield
-    app.state.mcp = None
+    """Open the MCP connection on startup and release it on shutdown."""
+    settings = get_settings()
+
+    manager = StorageMCPClient(
+        command=settings.mcp_server_command,
+        args=settings.mcp_server_args,
+        project_directory=settings.mcp_server_dir,
+    )
+
+    try:
+        await manager.start()
+    except Exception:
+        if settings.mcp_required:
+            raise
+        logger.exception("MCP server unavailable; starting in degraded mode")
+        app.state.mcp = None
+    else:
+        logger.info("MCP server ready: %d tools available", manager.tool_count)
+        app.state.mcp = manager
+
+    try:
+        yield
+    finally:
+        await manager.stop()
 
 
 def create_app() -> FastAPI:
