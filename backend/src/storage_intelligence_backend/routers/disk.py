@@ -4,13 +4,17 @@ Backed directly by the MCP client via ``call_tool``; all endpoints are
 read-only.
 """
 
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends
 
 from ..deps import get_mcp_manager
 from ..mcp.manager import StorageMCPClient
-from ..schemas import DirectoryDiskUsageResponse, DiskUsageResponse
+from ..schemas import (
+    DirectoryDiskUsageResponse,
+    DiskUsageResponse,
+    ExploreDirectoryResponse,
+)
 
 router = APIRouter(prefix="/disk", tags=["disk"])
 
@@ -49,11 +53,33 @@ async def directory_disk_usage(
     return DirectoryDiskUsageResponse(**result)
 
 
-@router.get("/explore")
-async def explore_directory() -> str:
-    return "not yet implemented"
+@router.get("/explore", response_model=ExploreDirectoryResponse)
+async def explore_directory(
+    manager: StorageMCPClient = Depends(get_mcp_manager),
+    path: str | None = None,
+    pattern: str = "",
+    search: str = "",
+    kind: Literal["all", "files", "dirs"] = "all",
+    recursive: bool = False,
+    max_results: int = 100,
+) -> ExploreDirectoryResponse:
+    """List the entries inside ``path``, one structured record each.
 
-
-@router.get("/scan")
-async def scan_disk() -> str:
-    return "not yet implemented"
+    Non-recursive (default) lists only direct children; ``recursive`` walks the
+    whole tree below ``path``. ``pattern`` and ``search`` filter on each entry's
+    own name, ``kind`` narrows to files or directories, and ``max_results`` caps
+    the list with ``truncated`` reporting whether more matches existed. Omits the
+    argument when no path is given so the MCP tool applies its own default (home
+    directory).
+    """
+    arguments: dict[str, Any] = {
+        "pattern": pattern,
+        "search": search,
+        "kind": kind,
+        "recursive": recursive,
+        "max_results": max_results,
+    }
+    if path is not None:
+        arguments["path"] = path
+    result = await manager.call_tool("explore_directory", arguments)
+    return ExploreDirectoryResponse(**result)

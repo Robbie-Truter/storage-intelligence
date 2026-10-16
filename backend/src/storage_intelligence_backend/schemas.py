@@ -47,6 +47,26 @@ class DirectoryDiskUsageResponse(BaseModel):
     entries: list[DirectoryUsageEntry]
 
 
+class ExploreDirectoryEntry(BaseModel):
+    """One entry from the ``explore_directory`` listing, in scan order."""
+
+    name: str
+    path: str
+    type: str
+
+
+class ExploreDirectoryResponse(BaseModel):
+    """Result of ``explore_directory``.
+
+    ``entries`` lists the matching children of ``path``; ``truncated`` reports
+    whether scanning stopped at ``max_results`` with more matches unseen.
+    """
+
+    path: str
+    entries: list[ExploreDirectoryEntry]
+    truncated: bool
+
+
 class ReadinessResponse(BaseModel):
     """Readiness payload, including MCP availability."""
 

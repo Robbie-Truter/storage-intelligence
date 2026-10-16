@@ -1,4 +1,5 @@
-"""Tests for ``GET /api/disk/usage`` and ``GET /api/disk/directory``.
+"""Tests for ``GET /api/disk/usage``, ``GET /api/disk/directory`` and
+``GET /api/disk/explore``.
 
 Use a fake MCP manager via ``dependency_overrides`` so the real subprocess is
 never spawned; the MCP connection itself is covered by integration tests.
@@ -27,6 +28,15 @@ DIRECTORY_RESULT: dict[str, Any] = {
         {"name": "big.bin", "type": "file", "size_bytes": 900},
         {"name": "Downloads", "type": "directory", "size_bytes": 400},
     ],
+}
+
+EXPLORE_RESULT: dict[str, Any] = {
+    "path": "/Users/me",
+    "entries": [
+        {"name": "core.py", "path": "/Users/me/core.py", "type": "file "},
+        {"name": "src", "path": "/Users/me/src", "type": "directory "},
+    ],
+    "truncated": False,
 }
 
 
@@ -130,3 +140,55 @@ def test_directory_usage_passes_path_and_top_n() -> None:
     )
     assert response.status_code == 200
     assert fake.calls == [("directory_disk_usage", {"path": "/tmp", "top_n": 3})]
+
+
+def test_explore_directory_returns_payload() -> None:
+    response = _disk_client(FakeMCPClient(EXPLORE_RESULT)).get("/api/disk/explore")
+    assert response.status_code == 200
+    assert response.json() == EXPLORE_RESULT
+
+
+def test_explore_directory_calls_tool_with_defaults() -> None:
+    fake = FakeMCPClient(EXPLORE_RESULT)
+    _disk_client(fake).get("/api/disk/explore")
+    assert fake.calls == [
+        (
+            "explore_directory",
+            {
+                "pattern": "",
+                "search": "",
+                "kind": "all",
+                "recursive": False,
+                "max_results": 100,
+            },
+        )
+    ]
+
+
+def test_explore_directory_passes_path_and_filters() -> None:
+    fake = FakeMCPClient(EXPLORE_RESULT)
+    response = _disk_client(fake).get(
+        "/api/disk/explore",
+        params={
+            "path": "/tmp",
+            "pattern": "*.py",
+            "search": "core",
+            "kind": "files",
+            "recursive": True,
+            "max_results": 5,
+        },
+    )
+    assert response.status_code == 200
+    assert fake.calls == [
+        (
+            "explore_directory",
+            {
+                "path": "/tmp",
+                "pattern": "*.py",
+                "search": "core",
+                "kind": "files",
+                "recursive": True,
+                "max_results": 5,
+            },
+        )
+    ]
