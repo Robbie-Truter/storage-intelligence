@@ -9,11 +9,13 @@ import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from . import __version__
 from .config import get_settings
+from .mcp.errors import MCPToolError, MCPUnavailable
 from .mcp.manager import StorageMCPClient
 from .routers import agent, cleanup, disk, health
 
@@ -65,6 +67,14 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.exception_handler(MCPUnavailable)
+    async def _mcp_unavailable(_: Request, exc: MCPUnavailable) -> JSONResponse:
+        return JSONResponse(status_code=503, content={"detail": str(exc)})
+
+    @app.exception_handler(MCPToolError)
+    async def _mcp_tool_error(_: Request, exc: MCPToolError) -> JSONResponse:
+        return JSONResponse(status_code=400, content={"detail": exc.to_detail()})
 
     app.include_router(health.router)
     app.include_router(disk.router, prefix="/api")
