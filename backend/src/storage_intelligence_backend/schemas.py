@@ -5,6 +5,8 @@ agent and cleanup models are added alongside their endpoints in later
 milestones.
 """
 
+from typing import Literal
+
 from pydantic import BaseModel
 
 
@@ -15,7 +17,7 @@ class HealthResponse(BaseModel):
 
 
 class DiskUsageResponse(BaseModel):
-    """Result of ``get_disk_usage``.
+    """Result of ``disk_usage``.
 
     Figures describe the whole volume containing ``path``, not ``path`` itself.
     """
@@ -25,6 +27,24 @@ class DiskUsageResponse(BaseModel):
     used_bytes: int
     free_bytes: int
     usage_percent: float
+
+
+class DirectoryUsageEntry(BaseModel):
+    """One child in the ``directory_disk_usage`` ranking."""
+
+    name: str
+    type: Literal["file", "directory"]
+    size_bytes: int
+
+
+class DirectoryDiskUsageResponse(BaseModel):
+    """Result of ``directory_disk_usage``.
+
+    The largest immediate children of ``path``, largest first.
+    """
+
+    path: str
+    entries: list[DirectoryUsageEntry]
 
 
 class ReadinessResponse(BaseModel):

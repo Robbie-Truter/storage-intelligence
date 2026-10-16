@@ -180,7 +180,7 @@ class DirectoryDiskUsageResult(TypedDict):
 
 
 class GetDiskUsageResult(TypedDict):
-    """Successful `get_disk_usage` result.
+    """Successful `disk_usage` result.
 
     Figures describe the whole volume, not the directory that was passed in.
 

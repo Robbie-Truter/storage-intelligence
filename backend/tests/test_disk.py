@@ -1,4 +1,4 @@
-"""Tests for ``GET /api/disk/usage``.
+"""Tests for ``GET /api/disk/usage`` and ``GET /api/disk/directory``.
 
 Use a fake MCP manager via ``dependency_overrides`` so the real subprocess is
 never spawned; the MCP connection itself is covered by integration tests.
@@ -19,6 +19,14 @@ USAGE_RESULT: dict[str, Any] = {
     "used_bytes": 200,
     "free_bytes": 300,
     "usage_percent": 40.0,
+}
+
+DIRECTORY_RESULT: dict[str, Any] = {
+    "path": "/Users/me",
+    "entries": [
+        {"name": "big.bin", "type": "file", "size_bytes": 900},
+        {"name": "Downloads", "type": "directory", "size_bytes": 400},
+    ],
 }
 
 
@@ -70,7 +78,7 @@ def test_disk_usage_calls_tool_without_path(
     disk_client: TestClient, fake_manager: FakeMCPClient
 ) -> None:
     disk_client.get("/api/disk/usage")
-    assert fake_manager.calls == [("get_disk_usage", {})]
+    assert fake_manager.calls == [("disk_usage", {})]
 
 
 def test_disk_usage_passes_path_through(
@@ -78,15 +86,15 @@ def test_disk_usage_passes_path_through(
 ) -> None:
     response = disk_client.get("/api/disk/usage", params={"path": "/tmp"})
     assert response.status_code == 200
-    assert fake_manager.calls == [("get_disk_usage", {"path": "/tmp"})]
+    assert fake_manager.calls == [("disk_usage", {"path": "/tmp"})]
 
 
 def test_disk_usage_tool_error_returns_400(fake_manager: FakeMCPClient) -> None:
-    fake_manager.error = MCPToolError("get_disk_usage", "path does not exist")
+    fake_manager.error = MCPToolError("disk_usage", "path does not exist")
     response = _disk_client(fake_manager).get("/api/disk/usage")
     assert response.status_code == 400
     assert response.json() == {
-        "detail": {"tool": "get_disk_usage", "message": "path does not exist"}
+        "detail": {"tool": "disk_usage", "message": "path does not exist"}
     }
 
 
@@ -101,3 +109,24 @@ def test_disk_usage_503_without_manager(client: TestClient) -> None:
     response = client.get("/api/disk/usage")
     assert response.status_code == 503
     assert response.json() == {"detail": "MCP server is not available"}
+
+
+def test_directory_usage_returns_payload() -> None:
+    response = _disk_client(FakeMCPClient(DIRECTORY_RESULT)).get("/api/disk/directory")
+    assert response.status_code == 200
+    assert response.json() == DIRECTORY_RESULT
+
+
+def test_directory_usage_calls_tool_with_defaults() -> None:
+    fake = FakeMCPClient(DIRECTORY_RESULT)
+    _disk_client(fake).get("/api/disk/directory")
+    assert fake.calls == [("directory_disk_usage", {"top_n": 10})]
+
+
+def test_directory_usage_passes_path_and_top_n() -> None:
+    fake = FakeMCPClient(DIRECTORY_RESULT)
+    response = _disk_client(fake).get(
+        "/api/disk/directory", params={"path": "/tmp", "top_n": 3}
+    )
+    assert response.status_code == 200
+    assert fake.calls == [("directory_disk_usage", {"path": "/tmp", "top_n": 3})]

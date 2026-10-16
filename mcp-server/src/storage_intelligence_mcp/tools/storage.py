@@ -31,7 +31,7 @@ from storage_intelligence_mcp.utils import (
 # 1. explore_directory - what is in this directory?
 # 2. count_files - how many files of each type are in this folder?
 # 3. directory_disk_usage - which immediate children consume the most space?
-# 4. get_disk_usage - how much space is left on this volume?
+# 4. disk_usage - how much space is left on this volume?
 # 5. file_info - metadata for a single file or directory
 # 6. find_large_files - which files are bigger than a threshold?
 # 7. find_duplicate_files - are there identical files lurking around?
@@ -302,9 +302,9 @@ async def directory_disk_usage(
         raise
 
 
-# 4. get_disk_usage - how much space is left on this volume?
+# 4. disk_usage - how much space is left on this volume?
 @mcp.tool(annotations=READ_ONLY)
-async def get_disk_usage(ctx: Context, path: str = DEFAULT_PATH) -> GetDiskUsageResult:
+async def disk_usage(ctx: Context, path: str = DEFAULT_PATH) -> GetDiskUsageResult:
     """Get total, used, and free space for the volume containing a path.
 
     Reports the whole filesystem or volume that `path` lives on, not just `path`
@@ -336,7 +336,7 @@ async def get_disk_usage(ctx: Context, path: str = DEFAULT_PATH) -> GetDiskUsage
         }
 
     except Exception as exc:
-        await ctx.error(f"get_disk_usage failed: {type(exc).__name__}: {exc}")
+        await ctx.error(f"disk_usage failed: {type(exc).__name__}: {exc}")
         raise
 
 

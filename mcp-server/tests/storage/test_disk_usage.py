@@ -1,6 +1,6 @@
-"""Tests for get_disk_usage (src/storage_intelligence_mcp/tools/storage.py:301).
+"""Tests for disk_usage (src/storage_intelligence_mcp/tools/storage.py:301).
 
-Implements plans/get_disk_usage.md.
+Implements plans/disk_usage.md.
 """
 
 import shutil
@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock
 import pytest
 from fastmcp.exceptions import ToolError
 
-from storage_intelligence_mcp.tools.storage import get_disk_usage
+from storage_intelligence_mcp.tools.storage import disk_usage
 
 # shutil.disk_usage returns a named 3-tuple; the tool only reads
 # .total/.used/.free, so a local stand-in is enough for mocking.
@@ -45,7 +45,7 @@ async def test_happy_path_exact_values(
 ) -> None:
     patch_disk_usage(monkeypatch, Usage(total=1000, used=600, free=400))
 
-    result: Any = await get_disk_usage(ctx, path=str(tmp_path))
+    result: Any = await disk_usage(ctx, path=str(tmp_path))
 
     assert set(result) == {
         "path",
@@ -71,7 +71,7 @@ async def test_usage_percent_rounded_to_one_decimal(
 ) -> None:
     patch_disk_usage(monkeypatch, Usage(total=3, used=1, free=2))
 
-    result: Any = await get_disk_usage(ctx, path=str(tmp_path))
+    result: Any = await disk_usage(ctx, path=str(tmp_path))
 
     assert result["usage_percent"] == 33.3
 
@@ -87,7 +87,7 @@ async def test_zero_total_volume_reports_zero_percent(
 ) -> None:
     patch_disk_usage(monkeypatch, Usage(total=0, used=0, free=0))
 
-    result: Any = await get_disk_usage(ctx, path=str(tmp_path))
+    result: Any = await disk_usage(ctx, path=str(tmp_path))
 
     assert result["usage_percent"] == 0.0
     assert result["total_bytes"] == 0
@@ -106,7 +106,7 @@ async def test_path_echoes_passed_path_not_volume_root(
 ) -> None:
     patch_disk_usage(monkeypatch, Usage(total=1000, used=600, free=400))
 
-    result: Any = await get_disk_usage(ctx, path=str(tmp_path))
+    result: Any = await disk_usage(ctx, path=str(tmp_path))
 
     assert result["path"] == str(tmp_path)
 
@@ -131,7 +131,7 @@ async def test_missing_path_returns_path_error(
     missing = str(tmp_path / "does-not-exist")
 
     with pytest.raises(ToolError, match="Path not found"):
-        await get_disk_usage(ctx, path=missing)
+        await disk_usage(ctx, path=missing)
 
     ctx.error.assert_awaited_once()
     # Checked before disk_usage is consulted.
@@ -153,7 +153,7 @@ async def test_disk_usage_failure_propagates(
     monkeypatch.setattr(shutil, "disk_usage", boom)
 
     with pytest.raises(OSError, match="device unavailable"):
-        await get_disk_usage(ctx, path=str(tmp_path))
+        await disk_usage(ctx, path=str(tmp_path))
 
     ctx.error.assert_awaited_once()
 
@@ -169,7 +169,7 @@ async def test_ctx_info_awaited_with_path(
 ) -> None:
     patch_disk_usage(monkeypatch, Usage(total=1000, used=600, free=400))
 
-    await get_disk_usage(ctx, path=str(tmp_path))
+    await disk_usage(ctx, path=str(tmp_path))
 
     ctx.info.assert_awaited_once()
     message = ctx.info.await_args.args[0]
