@@ -11,7 +11,7 @@ storage-intelligence/
 ├── mcp-server/   # Python FastMCP server (tools, resources, prompts)
 ├── backend/      # Application backend (placeholder)
 ├── frontend/     # Application frontend (placeholder)
-├── .agents/      # Shared agent skills
+├── .opencode/    # opencode agents, commands, and skills
 └── .github/      # Shared CI workflows
 ```
 
@@ -21,7 +21,8 @@ storage-intelligence/
   development instructions.
 - **`backend/`** — placeholder for the application backend.
 - **`frontend/`** — placeholder for the React dashboard UI.
-- **`.agents/`** — shared agent skills used across the monorepo.
+- **`.opencode/`** — opencode configuration: subagents (`agents/`), slash commands
+  (`command/`), and shared skills (`skills/`).
 
 ## Getting Started
 

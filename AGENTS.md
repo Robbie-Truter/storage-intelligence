@@ -7,7 +7,7 @@ This repository is a monorepo. The root holds:
 - `mcp-server/` — the Python FastMCP server (its own `pyproject.toml`, `uv.lock`, `.python-version`, `src/`, and `tests/`).
 - `backend/` — application backend (placeholder).
 - `frontend/` — application frontend (placeholder).
-- `.agents/` — shared agent skills, and `.github/` — shared CI workflows.
+- `.opencode/` — opencode configuration (subagents, slash commands, skills), and `.github/` — shared CI workflows.
 
 All Python commands below run from the `mcp-server/` directory.
 
