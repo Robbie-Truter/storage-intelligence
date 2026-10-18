@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends
 from ..deps import get_mcp_manager
 from ..mcp.manager import StorageMCPClient
 from ..schemas import (
+    CountFilesResponse,
     DirectoryDiskUsageResponse,
     DiskUsageResponse,
     ExploreDirectoryResponse,
@@ -81,5 +82,24 @@ async def explore_directory(
     }
     if path is not None:
         arguments["path"] = path
+
     result = await manager.call_tool("explore_directory", arguments)
     return ExploreDirectoryResponse(**result)
+
+
+@router.get("/count", response_model=CountFilesResponse)
+async def count_files(
+    manager: StorageMCPClient = Depends(get_mcp_manager),
+    path: str | None = None,
+) -> CountFilesResponse:
+    """Count the files directly inside ``path``, grouped by extension.
+
+    Non-recursive: only files immediately inside ``path`` are counted and
+    subdirectory contents are ignored. Extensions are lowercased, so ``.PY`` and
+    ``.py`` group together, and files without an extension group under
+    ``"(no extension)"``. Omits the argument when no path is given so the MCP
+    tool applies its own default (home directory).
+    """
+    arguments = {} if path is None else {"path": path}
+    result = await manager.call_tool("count_files", arguments)
+    return CountFilesResponse(**result)

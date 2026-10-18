@@ -1,8 +1,8 @@
 """Pydantic request/response models shared across routers.
 
-Only the health payloads and the disk usage payload are defined for now; the
-agent and cleanup models are added alongside their endpoints in later
-milestones.
+The health payloads and the deterministic disk payloads (usage, directory,
+explore, count) are defined here; the agent and cleanup models are added
+alongside their endpoints in later milestones.
 """
 
 from typing import Literal
@@ -65,6 +65,19 @@ class ExploreDirectoryResponse(BaseModel):
     path: str
     entries: list[ExploreDirectoryEntry]
     truncated: bool
+
+
+class CountFilesResponse(BaseModel):
+    """Result of ``count_files``.
+
+    ``by_extension`` counts the files directly inside ``path`` per lowercased
+    extension, largest count first; unextended files group under
+    ``"(no extension)"``.
+    """
+
+    path: str
+    total_files: int
+    by_extension: dict[str, int]
 
 
 class ReadinessResponse(BaseModel):
