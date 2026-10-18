@@ -1,4 +1,4 @@
 $kind: http-request
 order: 1000
 method: GET
-url: '{{base_url}}/api/disk/usage'
+url: "{{base_url}}/api/disk/usage"
