@@ -8,7 +8,7 @@ Context for the next workstream: building `backend/`. No code here — backgroun
 - Moved the existing Python MCP project into `mcp-server/` as a self-contained `uv` project (its own `pyproject.toml`, `uv.lock`, `.python-version`, `src/`, `tests/`, `.venv`, `Makefile`, `README.md`).
 - Left the package name and all imports unchanged (`storage_intelligence`); this was a pure move, not a rename.
 - Added placeholder `backend/` and `frontend/` directories.
-- Kept shared tooling at the root: `.agents/` skills, `.github/workflows/ci.yml`, `AGENTS.md`, root `README.md`.
+- Kept shared tooling at the root: `.opencode/` (agents, commands, skills), `.github/workflows/ci.yml`, `AGENTS.md`, root `README.md`.
 - Added root-level editor config: `pyrightconfig.json` (points Pyright/Pylance at `mcp-server/.venv` and `mcp-server/src`) and `.vscode/settings.json` (interpreter → `mcp-server/.venv/bin/python`).
 - Verified `mcp-server/` from inside it: ruff, ruff format, pyright, 119 pytest tests, `uv build`, and server import all pass.
 
@@ -54,7 +54,8 @@ Goal: a `backend/` service (FastAPI) that uses LangChain to talk to the `mcp-ser
 - **Model:** provider-agnostic `init_chat_model` string from env (default `openai:gpt-4.1`). Provider API keys
   live on the backend only and are never exposed to the React frontend.
 - **Deterministic vs agent:** normal disk usage / scan endpoints call MCP directly (no LLM). Agent endpoints
-  use an LLM over an **explicit allowlist of approved read-only tools** only — not annotations alone.
+  use an LLM over an **explicit allowlist** of read-only tools only — all 10 read-only tools (everything except
+  `trash_path`), not annotations alone.
 - **Destructive safety:** keep `trash_path` in the MCP server and reuse its existing dry-run/execution logic.
   The agent may use allowlisted read-only tools; the backend may call `trash_path` with `confirm=False` to
   build a preview. `confirm=True` is **never** exposed to the agent and is only issued server-side after
@@ -93,6 +94,7 @@ backend/
 ├── src/storage_intelligence_backend/
 │   ├── main.py               # create_app() + lifespan, mounts routers
 │   ├── config.py             # pydantic-settings Settings
+│   ├── deps.py               # FastAPI dependencies (get_mcp_manager)
 │   ├── schemas.py            # Pydantic request/response models
 │   ├── mcp/
 │   │   ├── manager.py        # StorageMCPClient: owns Client + MCPAdapter + allowlisted tool map
@@ -107,9 +109,9 @@ backend/
 │       ├── agent.py          # LLM-driven; read-only tools
 │       └── cleanup.py        # preview + confirmed execute
 └── tests/
-    ├── conftest.py
+    ├── conftest.py               # shared ``client`` fixture (no lifespan)
     ├── test_health.py
-    ├── test_disk_api.py          # mocked MCP client
+    ├── test_disk.py              # mocked MCP manager
     ├── test_agent.py             # fake chat model, no creds
     ├── test_cleanup_safety.py    # preview binding, confirmation gate
     └── test_mcp_integration.py   # real subprocess, marked `integration`
@@ -121,9 +123,9 @@ backend/
   `MCPAdapter` and call `list_tools()` once. Hold everything on `AsyncExitStack` for graceful shutdown
   (adapter → client → subprocess). No process per tool call.
 - Store the client, the full tool map, and an **explicit allowlist** of agent-exposed tools on `app.state`.
-  Gate the agent on that allowlist (a hardcoded set of approved read-only tool names), not on MCP annotations:
-  annotations describe behaviour, they are not a security boundary. `trash_path` stays off the allowlist even
-  though it supports a safe preview mode.
+  Gate the agent on that allowlist (a hardcoded set of approved read-only tool names — all 10 read-only tools),
+  not on MCP annotations: annotations describe behaviour, they are not a security boundary. `trash_path` stays
+  off the allowlist even though it supports a safe preview mode.
 - Startup failure: catch and log, leave `app.state.mcp = None`; an `mcp_required` setting can opt into
   failing startup instead. Health endpoints report `ok`/`unavailable`.
 - Disconnection: wrap calls; on connection errors attempt one reconnect, else raise `MCPUnavailable` → 503.
@@ -131,15 +133,50 @@ backend/
 
 ## Endpoints
 
-- `GET /health` — **liveness**: is the FastAPI process up? Always cheap, no MCP dependency.
+Complete set of routes the backend needs to reach every MCP tool. The MCP server
+exposes 11 tools: 10 read-only (one deterministic route each) plus `trash_path`
+(cleanup). `scan` is a backend-side fan-out, not an MCP tool.
+
+### Health (no MCP dependency)
+
+- `GET /health` — **liveness**: is the FastAPI process up? Always cheap.
 - `GET /health/ready` — **readiness**: can the service fulfil requests that need MCP? Reports MCP status and
   tool count, and returns 503 when the MCP subprocess is unavailable. Keeps a temporarily dead MCP from
   looking like a dead backend.
-- Deterministic (no LLM): `GET /api/disk/usage`, later `/api/disk/directory`, `/api/disk/explore`, a combined
-  scan view. Backed by `client.call_tool_mcp(...)`; map `isError` to an HTTP error with the MCP message.
-- Agent (LLM): `POST /api/agent/analyze` `{path, question?}` → runs the allowlisted read-only agent, returns
-  `{summary, tool_calls}`.
-- Cleanup: `POST /api/cleanup/preview` then `POST /api/cleanup/execute` (see below).
+
+### Deterministic disk reads (no LLM) — one route per read-only tool
+
+Every route takes an optional `path` (the MCP tool's own default, the home directory, applies when omitted);
+the other query parameters mirror the tool signature. Backed by `client.call_tool(...)`; map `isError` to an
+HTTP error carrying the MCP message.
+
+| Route | MCP tool | Parameters (beyond `path`) |
+|---|---|---|
+| `GET /api/disk/usage` | `disk_usage` | — |
+| `GET /api/disk/directory` | `directory_disk_usage` | `top_n` (default 10) |
+| `GET /api/disk/explore` | `explore_directory` | `pattern`, `search`, `kind`, `recursive`, `max_results` |
+| `GET /api/disk/count` | `count_files` | — |
+| `GET /api/disk/info` | `file_info` | — |
+| `GET /api/disk/large-files` | `find_large_files` | `min_size_mb`, `max_results` |
+| `GET /api/disk/duplicates` | `find_duplicate_files` | `min_size_bytes` |
+| `GET /api/disk/stale` | `find_stale_files` | `days_unmodified`, `max_results` |
+| `GET /api/disk/empty-directories` | `find_empty_directories` | `recursive` |
+| `GET /api/disk/junk` | `find_junk_files` | — |
+
+### Combined scan (no LLM)
+
+- `GET /api/disk/scan` — dashboard fan-out: calls several read-only tools in one request and returns an
+  aggregate (planned: `disk_usage` + `directory_disk_usage` + `find_large_files` + `find_duplicate_files` +
+  `find_junk_files` + `find_empty_directories` + `find_stale_files`). Composed by the backend, not an MCP tool.
+
+### Agent (LLM)
+
+- `POST /api/agent/analyze` `{path, question?}` → runs the agent over an **explicit allowlist of all 10
+  read-only tools** (everything except `trash_path`); returns `{summary, tool_calls}`.
+
+### Cleanup (mutating)
+
+- `POST /api/cleanup/preview` then `POST /api/cleanup/execute` → MCP `trash_path` (see below).
 
 ## Cleanup safety model
 
@@ -175,11 +212,13 @@ loaded automatically; `.env.example` committed and `.env` gitignored.
 
 ## Testing strategy
 
-- Unit tests mock the MCP manager / `call_tool_mcp` and inject a fake manager via dependency override
-  (`httpx.ASGITransport` + `AsyncClient`). Cover `/health` (liveness) and `/health/ready` (readiness, 503 when
+- Unit tests inject a fake MCP manager via `dependency_overrides[get_mcp_manager]`. The fake records
+  `call_tool(name, args)` calls and returns canned structured content or raises `MCPToolError` /
+  `MCPUnavailable`. The shared `client` fixture uses `fastapi.testclient.TestClient` without entering the
+  lifespan, so no subprocess is spawned. Cover `/health` (liveness) and `/health/ready` (readiness, 503 when
   MCP is down) separately.
 - Agent tests inject a fake chat model (e.g. `GenericFakeChatModel`) — no live LLM credentials required.
-- Integration tests spawn the real server over stdio, marked `integration`; assert `get_disk_usage` /
+- Integration tests spawn the real server over stdio, marked `integration`; assert `disk_usage` /
   `explore_directory` structured output and that `trash_path(confirm=False)` previews (never execute real
   paths).
 - Safety tests assert the agent tool map is limited to the explicit allowlist (no `trash_path`), that
@@ -198,19 +237,37 @@ ${{ matrix.package }}`, `cache-dependency-glob: ${{ matrix.package }}/uv.lock`; 
 
 ## Implementation order
 
-1. Scaffold `backend/` as an independent `uv` project with dependencies, configuration, and test setup
-   (including its own `pyrightconfig.json`).
-2. Add backend linting, formatting, type-checking, and test commands. Extend CI to include the backend as soon
-   as its scaffold is ready.
-3. Implement the MCP manager, FastAPI lifespan, `GET /health`, and `GET /health/ready`.
-4. Implement `GET /api/disk/usage` and verify the real MCP subprocess connection end-to-end. Treat this as an
-   early compatibility milestone before expanding the architecture.
-5. Implement the read-only LangChain agent and `POST /api/agent/analyze`, with fake-model tests.
-6. Implement cleanup preview and confirmed execution with path-bound confirmation, fingerprint revalidation,
-   and safety tests.
-7. Expand the API with directory exploration and combined scan endpoints.
-8. Complete CI, documentation, and final package-level verification
-   (`uv run ruff check --fix && uv run ruff format && uv run pyright && uv run pytest`, per package).
+Status key: `[x]` done · `[~]` in progress · `[ ]` not started. Update this list as tasks finish. One row per
+route; deterministic routes reuse the step-4 dependency and error mapping.
+
+1. [x] Scaffold `backend/` as an independent `uv` project with dependencies, configuration, and test setup.
+       (Pyright config lives in `backend/pyproject.toml` `[tool.pyright]` instead of a separate `pyrightconfig.json`.)
+2. [x] Add backend linting, formatting, type-checking, and test commands. CI runs a `[mcp-server, backend]` matrix.
+3. [x] Implement the MCP manager, FastAPI lifespan, `GET /health`, and `GET /health/ready`.
+4. [x] Implement `GET /api/disk/usage` → `disk_usage` and verify the real MCP subprocess connection
+       end-to-end (verified via `uvicorn` + `curl`: default path, explicit `path`, and bad-path → 400).
+       Endpoint unit tests added in `backend/tests/test_disk.py` (fake manager: payload, path pass-through,
+       tool error → 400, MCP down → 503).
+5. [ ] Remaining deterministic disk routes (no LLM), one per read-only tool:
+   - [x] `GET /api/disk/directory` → `directory_disk_usage` (handler named after the tool; unit tests in
+         `backend/tests/test_disk.py`: payload, default `top_n`, path/`top_n` pass-through).
+   - [x] `GET /api/disk/explore` → `explore_directory` (handler named after the tool; unit tests in
+         `backend/tests/test_disk.py`: payload, default filters, path + `pattern`/`search`/`kind`/`recursive`/`max_results` pass-through).
+   - [x] `GET /api/disk/count` → `count_files` (handler named after the tool; unit tests in
+         `backend/tests/test_disk.py`: payload, no-path default, path pass-through).
+   - [ ] `GET /api/disk/info` → `file_info`
+   - [ ] `GET /api/disk/large-files` → `find_large_files`
+   - [ ] `GET /api/disk/duplicates` → `find_duplicate_files`
+   - [ ] `GET /api/disk/stale` → `find_stale_files`
+   - [ ] `GET /api/disk/empty-directories` → `find_empty_directories`
+   - [ ] `GET /api/disk/junk` → `find_junk_files`
+6. [ ] `GET /api/disk/scan` — combined fan-out aggregate of the read-only tools.
+7. [ ] Implement the read-only LangChain agent over the allowlist of all 10 read-only tools and
+       `POST /api/agent/analyze`, with fake-model tests.
+8. [ ] Implement cleanup preview and confirmed execution (`trash_path`) with path-bound confirmation, fingerprint
+       revalidation, and safety tests.
+9. [ ] Complete CI, documentation, and final package-level verification
+       (`uv run ruff check --fix && uv run ruff format && uv run pyright && uv run pytest`, per package).
 
 ## Risks to verify during implementation
 
@@ -226,5 +283,5 @@ ${{ matrix.package }}`, `cache-dependency-glob: ${{ matrix.package }}/uv.lock`; 
 
 - Monorepo changes and rationale: `MONOREPO_MIGRATION_PLAN.md`.
 - Repo-wide rules and verification commands: `AGENTS.md`.
-- Shared skills: `.agents/skills/` (`python-quality`, `fastmcp-tool-dev`, `safe-cleanup-testing`).
+- Shared skills: `.opencode/skills/` (`python-quality`, `fastmcp-tool-dev`, `safe-cleanup-testing`).
 - MCP server details: `mcp-server/README.md`.

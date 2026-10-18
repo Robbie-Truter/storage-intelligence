@@ -15,6 +15,7 @@ from ..schemas import (
     DirectoryDiskUsageResponse,
     DiskUsageResponse,
     ExploreDirectoryResponse,
+    FileInfoResponse,
 )
 
 router = APIRouter(prefix="/disk", tags=["disk"])
@@ -103,3 +104,18 @@ async def count_files(
     arguments = {} if path is None else {"path": path}
     result = await manager.call_tool("count_files", arguments)
     return CountFilesResponse(**result)
+
+
+@router.get("/info", response_model=FileInfoResponse)
+async def file_info(
+    manager: StorageMCPClient = Depends(get_mcp_manager),
+    path: str | None = None,
+) -> FileInfoResponse:
+    """Report the disk info for the whole volume containing ``path``.
+
+    Omits the argument when no path is given so the MCP tool applies its own
+    default (home directory).
+    """
+    arguments = {} if path is None else {"path": path}
+    result = await manager.call_tool("file_info", arguments)
+    return FileInfoResponse(**result)

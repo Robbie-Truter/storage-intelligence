@@ -2,5 +2,5 @@ $kind: collection
 name: Disk
 description: |-
   Deterministic disk endpoints — no LLM involved. Backed directly by MCP call_tool.
-  Implemented: usage, directory, explore, count. Planned: combined scan.
+  Implemented: usage, directory, explore, count, info. Planned: combined scan.
 order: 2000

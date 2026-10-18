@@ -1,7 +1,7 @@
 """Pydantic request/response models shared across routers.
 
 The health payloads and the deterministic disk payloads (usage, directory,
-explore, count) are defined here; the agent and cleanup models are added
+explore, count, info) are defined here; the agent and cleanup models are added
 alongside their endpoints in later milestones.
 """
 
@@ -78,6 +78,18 @@ class CountFilesResponse(BaseModel):
     path: str
     total_files: int
     by_extension: dict[str, int]
+
+
+class FileInfoResponse(BaseModel):
+    """Result of ``file_info``."""
+
+    name: str
+    path: str
+    type: Literal["file", "directory"]
+    size_bytes: int
+    modified: float
+    created: float
+    extension: str
 
 
 class ReadinessResponse(BaseModel):

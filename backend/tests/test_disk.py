@@ -1,5 +1,5 @@
 """Tests for ``GET /api/disk/usage``, ``GET /api/disk/directory``,
-``GET /api/disk/explore`` and ``GET /api/disk/count``.
+``GET /api/disk/explore``, ``GET /api/disk/count``, and ``GET /api/disk/info``.
 
 Use a fake MCP manager via ``dependency_overrides`` so the real subprocess is
 never spawned; the MCP connection itself is covered by integration tests.
@@ -37,6 +37,16 @@ EXPLORE_RESULT: dict[str, Any] = {
         {"name": "src", "path": "/Users/me/src", "type": "directory "},
     ],
     "truncated": False,
+}
+
+FILE_INFO_RESULT: dict[str, Any] = {
+    "name": "storage-intelligence",
+    "path": "/home/user/storage-intelligence",
+    "type": "directory",
+    "size_bytes": 4096,
+    "modified": 1728000000.0,
+    "created": 1728000000.0,
+    "extension": "",
 }
 
 COUNT_RESULT: dict[str, Any] = {
@@ -217,3 +227,22 @@ def test_count_files_passes_path_through() -> None:
     response = _disk_client(fake).get("/api/disk/count", params={"path": "/tmp"})
     assert response.status_code == 200
     assert fake.calls == [("count_files", {"path": "/tmp"})]
+
+
+def test_info_returns_payload() -> None:
+    response = _disk_client(FakeMCPClient(FILE_INFO_RESULT)).get("/api/disk/info")
+    assert response.status_code == 200
+    assert response.json() == FILE_INFO_RESULT
+
+
+def test_info_calls_tool_without_path() -> None:
+    fake = FakeMCPClient(FILE_INFO_RESULT)
+    _disk_client(fake).get("/api/disk/info")
+    assert fake.calls == [("file_info", {})]
+
+
+def test_info_passes_path_through() -> None:
+    fake = FakeMCPClient(FILE_INFO_RESULT)
+    response = _disk_client(fake).get("/api/disk/info", params={"path": "/tmp"})
+    assert response.status_code == 200
+    assert fake.calls == [("file_info", {"path": "/tmp"})]

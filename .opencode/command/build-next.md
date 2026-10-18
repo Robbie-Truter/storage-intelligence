@@ -10,7 +10,7 @@ Run a two-step sequential handoff to complete exactly ONE todo item from `BACKEN
 
 **Step 3 — build.** Use the Task tool with subagent_type `builder`. The task description must contain the scout's **entire brief verbatim** (ITEM through RISKS/UNKNOWN), followed by: "Read AGENTS.md for repo rules. Execute this brief only, run its VERIFY commands, tick only this item, then report."
 
-If the brief contains an `UNKNOWN:` line, do not dispatch it — report the gap to the user and ask how to resolve it.
+If the brief contains an `UNKNOWN:` line followed by anything other than "none", do not dispatch it — stop immediately, print the gap to the user, and ask how to resolve it.
 
 **Step 4 — relay.** Report the builder's summary (item id, what changed, files, verification, brief corrections) to the user. If verification failed, say so plainly.
 
