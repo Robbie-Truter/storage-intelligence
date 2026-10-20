@@ -5,11 +5,11 @@
 This repository is a monorepo. The root holds:
 
 - `mcp-server/` — the Python FastMCP server (its own `pyproject.toml`, `uv.lock`, `.python-version`, `src/`, and `tests/`).
-- `backend/` — application backend (placeholder).
+- `backend/` — application backend (FastAPI + LangChain; its own `pyproject.toml`, `uv.lock`, `.python-version`, `src/`, and `tests/`).
 - `frontend/` — application frontend (placeholder).
 - `.opencode/` — opencode configuration (subagents, slash commands, skills), and `.github/` — shared CI workflows.
 
-All Python commands below run from the `mcp-server/` directory.
+All Python commands below run from the package directory you are working in (`mcp-server/` or `backend/`). Each package is a self-contained `uv` project with its own `.venv` and tool config — do not run one package's commands from another's directory.
 
 ## Git branching and merge policy
 
@@ -55,11 +55,15 @@ run the relevant checks, and the final integration into `main` must verify the c
 
 ## Quality Standards & Tooling
 
+These standards apply to every Python package in the monorepo (`mcp-server/`, `backend/`). Each package has
+its own `pyproject.toml` with `[tool.ruff]` and `[tool.pyright]` configured to the same standards, and its
+own `.venv`.
+
 - **Package Manager**: Use `uv` for environment and dependency management.
 - **Linter & Formatter**: Code must adhere to Ruff standards (`py313` target, 88 line length).
-- **Type Checker**: Use Pyright (`basic` mode, configured in `pyproject.toml` under `[tool.pyright]`). All code must pass type checking.
-- **Testing**: Use Pytest for tests (run with `uv run pytest` from `mcp-server/`); all existing tests must keep passing.
-- **Verification Commands** (run all from `mcp-server/` before considering a task complete):
+- **Type Checker**: Use Pyright (`basic` mode, configured in each package's `pyproject.toml` under `[tool.pyright]`). All code must pass type checking.
+- **Testing**: Use Pytest for tests (run with `uv run pytest` from the package directory); all existing tests must keep passing.
+- **Verification Commands** (run all from the package directory — `mcp-server/` or `backend/` — before considering a task complete):
   - `uv run ruff check --fix`
   - `uv run ruff format`
   - `uv run pyright`
