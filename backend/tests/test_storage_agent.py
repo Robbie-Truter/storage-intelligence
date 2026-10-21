@@ -59,7 +59,12 @@ class FakeChatModel(GenericFakeChatModel):
 
 
 class FakeManager(StorageMCPClient):
-    """Stands in for ``StorageMCPClient``; hands out a fixed tool catalogue."""
+    """Stands in for ``StorageMCPClient``; hands out a fixed tool catalogue.
+
+    The tools go straight into the manager's state, without passing through
+    ``allowlisted_tools``, so the allowlist is applied when the manager hands
+    the catalogue out.
+    """
 
     def __init__(self, tools: dict[str, BaseTool] | None = None) -> None:
         super().__init__(command="", args=[], project_directory="")
@@ -132,8 +137,8 @@ def _fake_model(monkeypatch: pytest.MonkeyPatch, *replies: AIMessage) -> FakeCha
 def _allowed_tools() -> dict[str, BaseTool]:
     """The catalogue the manager hands over: the allowlisted tools.
 
-    The manager filters the MCP tools to the allowlist when it opens the
-    connection, so the agent is given exactly these.
+    The manager applies the allowlist as it hands the catalogue out, so the
+    agent is given exactly these.
     """
     return {name: _stub_tool(name) for name in READONLY_TOOL_ALLOWLIST}
 

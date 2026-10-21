@@ -1,8 +1,9 @@
 """Read-only LangChain agent over an explicit allowlist of MCP tools.
 
-The tool catalogue is composed from the MCP server's allowlisted tools. The
-agent sees only the tools in ``READONLY_TOOL_ALLOWLIST`` (including the MCP
-server's ``preview_trash`` tool), and never the raw ``trash_path`` tool.
+The tool catalogue comes from the manager, which hands over only the tools in
+``READONLY_TOOL_ALLOWLIST`` (including the MCP server's ``preview_trash``
+tool); the raw ``trash_path`` tool is never among them. The allowlist is the
+manager's business - see ``StorageMCPClient.langchain_tools``.
 """
 
 from typing import Any
@@ -24,8 +25,10 @@ def build_agent(
 ) -> Any:
     """Build a read-only agent from the tools the manager offers.
 
-    The manager hands over only the allowlisted read-only tools, so the agent
-    never sees the raw ``trash_path`` tool.
+    The tools come from ``manager.langchain_tools``, which applies the
+    read-only allowlist: only the allowlisted tools - ``preview_trash``
+    included - are bound to the model, and the raw ``trash_path`` tool is
+    never among them.
 
     ``max_iterations`` caps how many times the agent may loop: ask the model,
     run a tool, ask again. The cap counts each of those steps separately, so
@@ -37,9 +40,11 @@ def build_agent(
         temperature=temperature,
     )
 
+    tools = list(manager.langchain_tools.values())
+
     agent = create_agent(
         model=llm,
-        tools=list(manager.langchain_tools.values()),
+        tools=tools,
     )
 
     return agent.with_config({"recursion_limit": max_iterations})

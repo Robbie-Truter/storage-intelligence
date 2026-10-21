@@ -3,8 +3,8 @@
 Safety properties under test: the catalogue holds exactly the allowlisted
 read-only MCP tools (including ``preview_trash``) and never the raw
 ``trash_path`` tool. The filtering lives in ``mcp/manager.py``, where the
-catalogue is built; it is called here with stub tools, so no MCP subprocess is
-spawned.
+allowlist is applied as the manager hands the catalogue out; it is called here
+with stub tools, so no MCP subprocess is spawned.
 """
 
 from typing import Any
@@ -14,6 +14,7 @@ from pydantic import BaseModel
 
 from storage_intelligence_backend.mcp.manager import (
     READONLY_TOOL_ALLOWLIST,
+    StorageMCPClient,
     allowlisted_tools,
 )
 
@@ -42,6 +43,14 @@ def _over_exposed_tools() -> list[BaseTool]:
     return [_stub_tool(name) for name in names]
 
 
+class _Manager(StorageMCPClient):
+    """A manager whose tool catalogue was filled without opening a connection."""
+
+    def __init__(self, tools: list[BaseTool]) -> None:
+        super().__init__(command="", args=[], project_directory="")
+        self._langchain_tools = {tool.name: tool for tool in tools}
+
+
 def test_allowlist_includes_preview_trash_and_excludes_trash_path() -> None:
     assert len(READONLY_TOOL_ALLOWLIST) == 11
     assert "preview_trash" in READONLY_TOOL_ALLOWLIST
@@ -55,3 +64,13 @@ def test_tool_map_is_exactly_allowlisted_tools() -> None:
     assert len(tool_map) == len(READONLY_TOOL_ALLOWLIST)
     assert "trash_path" not in tool_map
     assert "not_on_the_allowlist" not in tool_map
+
+
+def test_the_manager_hands_out_only_allowlisted_tools() -> None:
+    manager = _Manager(_over_exposed_tools())
+
+    handed_out = manager.langchain_tools
+
+    assert set(handed_out) == set(READONLY_TOOL_ALLOWLIST)
+    assert "trash_path" not in handed_out
+    assert "not_on_the_allowlist" not in handed_out

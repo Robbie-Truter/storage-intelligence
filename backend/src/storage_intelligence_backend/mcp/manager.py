@@ -59,9 +59,10 @@ READONLY_TOOL_ALLOWLIST: frozenset[str] = frozenset(
 def allowlisted_tools(tools: Iterable[BaseTool]) -> dict[str, BaseTool]:
     """Keep only the tools on the allowlist, keyed by tool name.
 
-    This is the one place the allowlist is applied: the catalogue the agent
-    gets is built here, when the MCP connection is opened, so a tool that is
-    not on the list - ``trash_path`` above all - never reaches the agent.
+    This is the one place the allowlist is applied. ``langchain_tools`` calls
+    it on every read, so whatever the manager holds - the tools the MCP server
+    lists, or a catalogue handed over by a test - the agent only ever sees
+    the allowlisted ones. ``trash_path`` is not on the list.
     """
     return {tool.name: tool for tool in tools if tool.name in READONLY_TOOL_ALLOWLIST}
 
@@ -95,18 +96,21 @@ class StorageMCPClient:
     def langchain_tools(self) -> dict[str, BaseTool]:
         """Allowlisted LangChain tools for the agent, keyed by tool name.
 
-        Only names in ``READONLY_TOOL_ALLOWLIST`` ever appear here — raw
-        ``trash_path`` is filtered out during discovery, not by annotation. A
-        copy is returned so callers cannot mutate the boundary.
+        The allowlist is applied here, on the way out, so a tool that is not
+        on it - raw ``trash_path`` above all - never reaches the agent, no
+        matter how the catalogue was filled. A copy is returned so callers
+        cannot mutate the boundary.
         """
-        return dict(self._langchain_tools)
+        return allowlisted_tools(self._langchain_tools.values())
 
     async def start(self) -> None:
         """Open the MCP connection and cache the tool catalogues.
 
         One connection serves both surfaces: the raw MCP tool map used by the
-        deterministic ``call_tool`` path, and the allowlisted LangChain tools
-        served to the agent. Connection failures propagate to the caller; the
+        deterministic ``call_tool`` path, and the LangChain tools served to the
+        agent. The LangChain tools are stored as they were listed; the
+        allowlist is applied when they are handed out (see
+        ``langchain_tools``). Connection failures propagate to the caller; the
         startup policy (fail fast vs. run degraded) belongs to the lifespan.
         """
         transport = UvStdioTransport(
@@ -123,7 +127,7 @@ class StorageMCPClient:
         adapter = MCPAdapter(self._client)
         self._adapter = await self._stack.enter_async_context(adapter)
         agent_tools = await self._adapter.list_tools()
-        self._langchain_tools = allowlisted_tools(agent_tools)
+        self._langchain_tools = {tool.name: tool for tool in agent_tools}
         self._ready = True
 
     async def stop(self) -> None:

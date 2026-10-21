@@ -9,5 +9,6 @@ body:
   type: json
   content: |-
     {
-      "prompt": ""
+      "path": "/Users/me",
+      "question": "What takes the most space?"
     }

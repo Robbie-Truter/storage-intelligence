@@ -2,7 +2,9 @@
 
 The MCP server connection is opened on startup and closed on shutdown; when it
 cannot be reached the app starts in a degraded mode (readiness reports it) unless
-``mcp_required`` is set.
+``mcp_required`` is set. The read-only agent is not held here: it is built per
+request from the injected manager, so a missing provider key cannot stop the
+app from starting.
 """
 
 import logging
@@ -12,8 +14,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-
-from storage_intelligence_backend.agents.storage_agent import build_agent
 
 from . import __version__
 from .config import get_settings
@@ -29,7 +29,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Open the MCP connection on startup and release it on shutdown."""
     settings = get_settings()
 
-    app.state.agent = None
     app.state.mcp = None
 
     manager = StorageMCPClient(
@@ -48,13 +47,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         else:
             app.state.mcp = manager
             logger.info("MCP server ready: %d tools available", manager.tool_count)
-
-            app.state.agent = build_agent(
-                model=settings.agent_model,
-                manager=manager,
-                temperature=settings.agent_temperature,
-                max_iterations=settings.agent_max_iterations,
-            )
 
         yield
     finally:
