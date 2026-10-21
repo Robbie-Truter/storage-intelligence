@@ -68,3 +68,11 @@ own `.venv`.
   - `uv run ruff format`
   - `uv run pyright`
   - `uv run pytest`
+
+## MCP Servers
+
+This environment has MCP servers enabled (use them when relevant):
+
+- `docs-langchain` — Docs by LangChain search/retrieval. Use for LangChain/LangGraph questions; prefer server results over prior knowledge and cite sources. Read-only, scoped to published docs.
+- `reference-langchain` — LangChain API reference search/get_symbol. Use to look up classes/functions/symbols and get signatures/parameters/examples.
+- `postman` — Postman API/workspace operations. Follow its instructions resource for usage.

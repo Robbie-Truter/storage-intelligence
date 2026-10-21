@@ -15,6 +15,8 @@ Scout in a sequential handoff: pick the next unfinished item and analyze it full
 
 1. Read `BACKEND_HANDOFF.md` → "Implementation order". Next item = first not-fully-done one (`[x]` done, `[~]` unfinished; sub-bullets of item 5 are separate items). If all are `[x]`, output exactly `ALL_DONE` and stop.
 
+Use `docs-langchain` and `reference-langchain` MCP servers when relevant for LangChain/LangGraph and API reference lookups.
+
 2. Analyze by reading code (`read`/`glob`/`grep`, read-only `git log/show/diff`; no writes):
    - MIRROR — nearest completed sibling (e.g. most recent disk route + its tests), cited `file:line`.
    - FILES — everything that must change. Check what a completed sibling actually touched; a disk route usually means the router, `schemas.py`, the test file, and the Postman request file + its folder's `.resources/definition.yaml` description.
