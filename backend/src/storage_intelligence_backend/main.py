@@ -13,6 +13,8 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from storage_intelligence_backend.agents.storage_agent import build_agent
+
 from . import __version__
 from .config import get_settings
 from .mcp.errors import MCPToolError, MCPUnavailable
@@ -27,6 +29,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Open the MCP connection on startup and release it on shutdown."""
     settings = get_settings()
 
+    app.state.agent = None
+    app.state.mcp = None
+
     manager = StorageMCPClient(
         command=settings.mcp_server_command,
         args=settings.mcp_server_args,
@@ -34,17 +39,23 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     )
 
     try:
-        await manager.start()
-    except Exception:
-        if settings.mcp_required:
-            raise
-        logger.exception("MCP server unavailable; starting in degraded mode")
-        app.state.mcp = None
-    else:
-        logger.info("MCP server ready: %d tools available", manager.tool_count)
-        app.state.mcp = manager
+        try:
+            await manager.start()
+        except Exception:
+            if settings.mcp_required:
+                raise
+            logger.exception("MCP server unavailable; starting in degraded mode")
+        else:
+            app.state.mcp = manager
+            logger.info("MCP server ready: %d tools available", manager.tool_count)
 
-    try:
+            app.state.agent = build_agent(
+                model=settings.agent_model,
+                manager=manager,
+                temperature=settings.agent_temperature,
+                max_iterations=settings.agent_max_iterations,
+            )
+
         yield
     finally:
         await manager.stop()

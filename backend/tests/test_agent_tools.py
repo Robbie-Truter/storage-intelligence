@@ -1,11 +1,10 @@
-"""Tests for the agent tool map.
+"""Tests for the tool catalogue the agent is given.
 
-Safety properties under test: the agent sees exactly the allowlisted read-only
-MCP tools from the manager (including ``preview_trash``) and never the raw
-``trash_path`` tool.
-
-Uses a fake manager shaped like ``FakeMCPClient`` in ``test_disk.py`` so no MCP
-subprocess is spawned.
+Safety properties under test: the catalogue holds exactly the allowlisted
+read-only MCP tools (including ``preview_trash``) and never the raw
+``trash_path`` tool. The filtering lives in ``mcp/manager.py``, where the
+catalogue is built; it is called here with stub tools, so no MCP subprocess is
+spawned.
 """
 
 from typing import Any
@@ -13,8 +12,10 @@ from typing import Any
 from langchain_core.tools import BaseTool, StructuredTool
 from pydantic import BaseModel
 
-from storage_intelligence_backend.agents.storage_agent import build_agent_tool_map
-from storage_intelligence_backend.mcp.manager import READONLY_TOOL_ALLOWLIST
+from storage_intelligence_backend.mcp.manager import (
+    READONLY_TOOL_ALLOWLIST,
+    allowlisted_tools,
+)
 
 
 class _StubInput(BaseModel):
@@ -34,27 +35,11 @@ def _stub_tool(name: str) -> BaseTool:
     )
 
 
-class FakeManager:
-    """Stands in for ``StorageMCPClient``."""
-
-    def __init__(self, tools: dict[str, BaseTool] | None = None) -> None:
-        self._tools = tools if tools is not None else {}
-
-    @property
-    def langchain_tools(self) -> dict[str, BaseTool]:
-        return dict(self._tools)
-
-    async def call_tool(self, name: str, arguments: dict[str, Any]) -> Any:
-        raise NotImplementedError
-
-
-def _over_exposed_tools() -> dict[str, BaseTool]:
-    """The manager's map as it would look if everything MCP serves leaked
-    through: the allowlist plus raw ``trash_path`` and an unknown name."""
-    tools = {name: _stub_tool(name) for name in READONLY_TOOL_ALLOWLIST}
-    tools["trash_path"] = _stub_tool("trash_path")
-    tools["not_on_the_allowlist"] = _stub_tool("not_on_the_allowlist")
-    return tools
+def _over_exposed_tools() -> list[BaseTool]:
+    """The MCP tools as they would look if everything served leaked through:
+    the allowlist plus raw ``trash_path`` and an unknown name."""
+    names = [*READONLY_TOOL_ALLOWLIST, "trash_path", "not_on_the_allowlist"]
+    return [_stub_tool(name) for name in names]
 
 
 def test_allowlist_includes_preview_trash_and_excludes_trash_path() -> None:
@@ -64,8 +49,7 @@ def test_allowlist_includes_preview_trash_and_excludes_trash_path() -> None:
 
 
 def test_tool_map_is_exactly_allowlisted_tools() -> None:
-    manager = FakeManager(tools=_over_exposed_tools())
-    tool_map = build_agent_tool_map(manager)
+    tool_map = allowlisted_tools(_over_exposed_tools())
 
     assert set(tool_map) == set(READONLY_TOOL_ALLOWLIST)
     assert len(tool_map) == len(READONLY_TOOL_ALLOWLIST)

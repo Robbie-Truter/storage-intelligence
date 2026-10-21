@@ -26,6 +26,7 @@ against the MCP server and recorded here:
     release stops sharing the transport).
 """
 
+from collections.abc import Iterable
 from contextlib import AsyncExitStack
 from pathlib import Path
 from typing import Any
@@ -53,6 +54,16 @@ READONLY_TOOL_ALLOWLIST: frozenset[str] = frozenset(
         "preview_trash",
     }
 )
+
+
+def allowlisted_tools(tools: Iterable[BaseTool]) -> dict[str, BaseTool]:
+    """Keep only the tools on the allowlist, keyed by tool name.
+
+    This is the one place the allowlist is applied: the catalogue the agent
+    gets is built here, when the MCP connection is opened, so a tool that is
+    not on the list - ``trash_path`` above all - never reaches the agent.
+    """
+    return {tool.name: tool for tool in tools if tool.name in READONLY_TOOL_ALLOWLIST}
 
 
 class StorageMCPClient:
@@ -112,11 +123,7 @@ class StorageMCPClient:
         adapter = MCPAdapter(self._client)
         self._adapter = await self._stack.enter_async_context(adapter)
         agent_tools = await self._adapter.list_tools()
-        self._langchain_tools = {
-            tool.name: tool
-            for tool in agent_tools
-            if tool.name in READONLY_TOOL_ALLOWLIST
-        }
+        self._langchain_tools = allowlisted_tools(agent_tools)
         self._ready = True
 
     async def stop(self) -> None:
