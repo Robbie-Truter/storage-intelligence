@@ -1,7 +1,11 @@
 """In-memory, path-bound preview and confirmation records.
 
-Scaffold only: preview creation, fingerprint revalidation, and the confirmation
-gate are implemented alongside the cleanup endpoints in a later milestone.
+Unused scaffolding: v1 has no preview store. The cleanup flow is frontend-driven
+- the frontend submits the paths the user selected and
+``POST /api/cleanup/execute`` passes them straight to MCP ``trash_path`` - so
+there is no preview to record and no confirmation gate to hold. The methods
+below stay unimplemented; they exist as a placeholder for a possible v2 preview
+store and must not be relied on.
 
 Note: this store is single-process only. Move to a database before running more
 than one worker.

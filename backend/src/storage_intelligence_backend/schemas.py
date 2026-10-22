@@ -1,13 +1,12 @@
 """Pydantic request/response models shared across routers.
 
 The health payloads, the deterministic disk payloads (usage, directory, explore,
-count, info), and the agent payloads are defined here; the cleanup models are
-added alongside their endpoints in a later milestone.
+count, info), the agent payloads, and the cleanup payloads are defined here.
 """
 
 from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class HealthResponse(BaseModel):
@@ -136,3 +135,46 @@ class AgentAnalyzeResponse(BaseModel):
 
     summary: str
     tool_calls: list[AgentToolCall]
+
+
+class CleanupExecuteRequest(BaseModel):
+    """Request body of ``POST /api/cleanup/execute``.
+
+    ``paths`` are the files/directories the frontend selected; they are handed
+    to the MCP ``trash_path`` tool unchanged. Nothing else is accepted - there
+    is no ``preview_id``, no preview store, and no client-supplied ``confirm``:
+    extra keys are rejected so a client cannot smuggle one in.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    paths: list[str] = Field(min_length=1)
+
+
+class CleanupFailure(BaseModel):
+    """One path that could not be sent to the trash.
+
+    ``error`` is the reason the tool reported, e.g. ``"OSError: ..."``.
+    """
+
+    path: str
+    error: str
+
+
+class CleanupExecuteResponse(BaseModel):
+    """Outcome of a cleanup execution run.
+
+    Mirrors the executed payload of the MCP ``trash_path`` tool: ``mode`` is
+    ``"executed"``, ``paths`` are the targets that existed (deepest path
+    first, deduplicated by the tool, so the order may differ from the
+    submitted list), ``deleted`` the ones that went to the trash, ``failed``
+    the ones that raised, and ``missing_paths`` the submitted targets that no
+    longer existed. ``total_valid_paths`` counts the targets that existed.
+    """
+
+    mode: str
+    paths: list[str]
+    deleted: list[str]
+    failed: list[CleanupFailure]
+    missing_paths: list[str]
+    total_valid_paths: int

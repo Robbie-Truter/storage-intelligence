@@ -9,6 +9,5 @@ body:
   type: json
   content: |-
     {
-      "preview_id": "",
-      "confirm": true
+      "paths": ["/Users/me/Downloads/old.zip"]
     }

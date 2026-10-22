@@ -28,12 +28,12 @@ backend/
 │   ├── agents/
 │   │   └── storage_agent.py  # build_agent(...) + read-only analysis
 │   ├── cleanup/
-│   │   └── preview_store.py  # in-memory, path-bound preview records
+│   │   └── preview_store.py  # unused scaffolding; v1 has no preview store
 │   └── routers/
 │       ├── health.py         # liveness + readiness
 │       ├── disk.py           # deterministic; no LLM
 │       ├── agent.py          # LLM-driven; read-only tools
-│       └── cleanup.py        # preview + confirmed execute
+│       └── cleanup.py        # execute: submits paths to MCP trash_path
 └── tests/
 ```
 
