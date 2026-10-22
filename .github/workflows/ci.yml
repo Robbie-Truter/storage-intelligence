@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ main, master, refactor/monorepo ]
+    branches: [master, refactor/monorepo-structure]
   pull_request:
-    branches: [ main, master, refactor/monorepo ]
+    branches: [master, refactor/monorepo-structure]
 
 # Cancel outdated workflow runs on open PR updates
 concurrency:
@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [ mcp-server, backend ]
+        package: [mcp-server, backend]
 
     defaults:
       run:
