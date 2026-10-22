@@ -23,6 +23,10 @@ async def analyze(
 ) -> AgentAnalyzeResponse:
     """Analyze the storage usage under ``path`` with the read-only agent.
 
+    ``path`` is optional - without it the agent starts from the default
+    location, which is where the MCP tools fall back to. ``question`` is
+    optional too: without one the agent looks for what takes the most space.
+
     The agent is built per request from the injected manager, and it is given
     only the tools on the read-only allowlist - never the raw ``trash_path``
     tool.

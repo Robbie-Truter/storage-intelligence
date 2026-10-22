@@ -221,6 +221,48 @@ async def test_analysis_reports_the_tools_it_used(
     assert "/data" in model.asked[0][-1].content
 
 
+async def test_analysis_without_a_path_leaves_the_location_to_the_tools(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """No path: the prompt points at the default location, not at a guess."""
+    model = _fake_model(monkeypatch, AIMessage(content="Nothing big here."))
+    manager = FakeManager(tools=_allowed_tools())
+
+    agent = build_agent(
+        model="openai:gpt-4.1",
+        manager=manager,
+        temperature=0.0,
+        max_iterations=10,
+    )
+
+    result = await run_readonly_analysis(agent)
+
+    prompt = model.asked[0][-1].content
+    assert "default location" in prompt
+    assert "Target path" not in prompt
+    assert result["summary"] == "Nothing big here."
+
+
+async def test_analysis_with_a_question_and_no_path_asks_without_a_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A question on its own is asked as it is - there is no path to add."""
+    model = _fake_model(monkeypatch, AIMessage(content="Nothing big here."))
+    manager = FakeManager(tools=_allowed_tools())
+
+    agent = build_agent(
+        model="openai:gpt-4.1",
+        manager=manager,
+        temperature=0.0,
+        max_iterations=10,
+    )
+
+    result = await run_readonly_analysis(agent, question="What is biggest?")
+
+    assert model.asked[0][-1].content == "What is biggest?"
+    assert result["summary"] == "Nothing big here."
+
+
 async def test_analysis_records_a_tool_that_reported_an_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

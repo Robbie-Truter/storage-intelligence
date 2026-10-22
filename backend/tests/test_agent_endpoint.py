@@ -211,6 +211,36 @@ def test_analyze_sends_the_question_and_the_path_to_the_model(
     assert "/tmp" in prompt
 
 
+def test_analyze_without_a_path_asks_about_the_default_location(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    model = _fake_model(monkeypatch, AIMessage(content="Nothing big here."))
+    manager = FakeManager(tools=_allowed_tools())
+
+    response = _agent_client(manager).post("/api/agent/analyze", json={})
+
+    assert response.status_code == 200
+    assert response.json()["summary"] == "Nothing big here."
+    prompt = model.asked[0][-1].content
+    assert "default location" in prompt
+    assert "Target path" not in prompt
+
+
+def test_analyze_with_only_a_question_keeps_the_question(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    model = _fake_model(monkeypatch, AIMessage(content="Nothing big here."))
+    manager = FakeManager(tools=_allowed_tools())
+
+    response = _agent_client(manager).post(
+        "/api/agent/analyze", json={"question": "What is biggest?"}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["summary"] == "Nothing big here."
+    assert model.asked[0][-1].content == "What is biggest?"
+
+
 def test_analyze_without_an_mcp_manager_returns_503(client: TestClient) -> None:
     response = client.post("/api/agent/analyze", json={"path": "/tmp"})
 

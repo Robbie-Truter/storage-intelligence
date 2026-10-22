@@ -52,10 +52,14 @@ def build_agent(
 
 async def run_readonly_analysis(
     agent: Any,
-    path: str,
+    path: str | None = None,
     question: str | None = None,
 ) -> dict[str, Any]:
     """Ask the agent about ``path`` and report back what it did.
+
+    ``path`` and ``question`` are both optional: without a path the agent
+    investigates the default location - the home directory the MCP tools fall
+    back to - and without a question it looks for what takes the most space.
 
     Returns the agent's final answer as ``summary``, and one record per tool
     call as ``tool_calls``. Each record has the tool ``name``, the ``args`` it
@@ -90,12 +94,27 @@ async def run_readonly_analysis(
     }
 
 
-def _build_prompt(path: str, question: str | None) -> str:
-    """The question sent to the agent; the path is always part of it."""
+def _build_prompt(path: str | None = None, question: str | None = None) -> str:
+    """The question sent to the agent; the path is part of it when there is one.
+
+    A path and a question are combined - the question first, the target path
+    below it. A question on its own is sent as it is. Without a path the agent
+    is pointed at the default location, which is where the MCP tools start
+    when the model leaves their ``path`` argument out.
+    """
     if question and question.strip():
-        return f"{question.strip()}\n\nTarget path: {path}"
+        if path:
+            return f"{question.strip()}\n\nTarget path: {path}"
+        return question.strip()
+
+    if path:
+        return (
+            f"Analyze the storage usage under {path} and report what takes the most "
+            "space."
+        )
     return (
-        f"Analyze the storage usage under {path} and report what takes the most space."
+        "Analyze the storage usage starting from the default location and report what "
+        "takes the most space."
     )
 
 

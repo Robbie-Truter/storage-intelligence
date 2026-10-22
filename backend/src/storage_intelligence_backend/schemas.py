@@ -103,11 +103,12 @@ class ReadinessResponse(BaseModel):
 class AgentAnalyzeRequest(BaseModel):
     """Request body of ``POST /api/agent/analyze``.
 
-    ``path`` is the directory the agent investigates; ``question`` is optional
-    and defaults to a general "what takes the most space" analysis.
+    ``path`` is the directory the agent investigates (defaults to the home
+    directory when omitted); ``question`` is optional and defaults to a general
+    "what takes the most space" analysis.
     """
 
-    path: str
+    path: str | None = None
     question: str | None = None
 
 
