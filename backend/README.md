@@ -220,7 +220,10 @@ model cannot delete anything, no matter how the catalogue is built.
   raises `GraphRecursionError`, which the route turns into a 400.
 - The model is provider-agnostic: `init_chat_model` with the
   `STORAGE_BACKEND_AGENT_MODEL` string (default `openai:gpt-4.1`) and
-  `STORAGE_BACKEND_AGENT_TEMPERATURE` (default `0.0`).
+  `STORAGE_BACKEND_AGENT_TEMPERATURE` (default `0.0`). Three providers are
+  installed and verified by `tests/test_provider_dependencies.py`:
+  `openai:*` (`langchain-openai`), `ollama:*` (`langchain-ollama`), and
+  `google_genai:*` (`langchain-google-genai`).
 
 ---
 
@@ -277,8 +280,10 @@ started from the `backend/` directory.
 | `STORAGE_BACKEND_CORS_ORIGINS` | `[]` | JSON array of allowed origins, e.g. `["http://localhost:5173"]` |
 
 Provider API keys are **not** modelled in `Settings`: LangChain reads them from
-the environment directly (`OPENAI_API_KEY`, …) and they never reach the
-frontend.
+the environment directly and they never reach the frontend. Use
+`OPENAI_API_KEY` for `openai:*`, `GOOGLE_API_KEY` for `google_genai:*`, and
+`OLLAMA_BASE_URL` (default `http://localhost:11434`) for `ollama:*`; Ollama
+needs no key.
 
 On startup the lifespan opens the MCP connection. If it fails, the app starts
 in **degraded mode** (readiness reports it) unless `STORAGE_BACKEND_MCP_REQUIRED`

@@ -13,6 +13,8 @@ dependencies = [
     "pydantic-settings>=2.10.0",
     "langchain[mcp]>=1.4.0",
     "langchain-openai>=1.0.0",
+    "langchain-ollama>=1.0.0",
+    "langchain-google-genai>=4.0.0",
 ]
 
 [project.scripts]
