@@ -35,8 +35,8 @@ class Settings(BaseSettings):
     mcp_server_args: list[str] = Field(default_factory=list)
     mcp_required: bool = False
 
-    # Agent / LLM.
-    agent_model: str = "openai:gpt-4.1"
+    # Agent / LLM. The model itself is chosen per request from the catalogue
+    # in ``agents/models.py``, so it is not an environment setting.
     agent_temperature: float = 0.0
     agent_max_iterations: int = 10
 

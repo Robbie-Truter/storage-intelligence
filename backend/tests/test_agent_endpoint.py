@@ -188,6 +188,41 @@ def test_models_lists_the_catalog_without_mcp_or_credentials(
     ]
 
 
+def test_analyze_rejects_a_model_outside_the_catalog() -> None:
+    manager = FakeManager(tools=_allowed_tools())
+
+    response = _agent_client(manager).post(
+        "/api/agent/analyze", json={"model": "not-a-model"}
+    )
+
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    assert "not-a-model" in detail
+    assert "openai-gpt" in detail
+
+
+def test_analyze_uses_the_model_selected_in_the_body(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_model = FakeChatModel(messages=iter([AIMessage(content="Nothing big here.")]))
+    selected: list[str] = []
+
+    def _init_chat_model(model: str, **_kwargs: Any) -> FakeChatModel:
+        selected.append(model)
+        return fake_model
+
+    monkeypatch.setattr(storage_agent, "init_chat_model", _init_chat_model)
+    manager = FakeManager(tools=_allowed_tools())
+
+    response = _agent_client(manager).post(
+        "/api/agent/analyze",
+        json={"model": "google-gemini", "path": "/tmp"},
+    )
+
+    assert response.status_code == 200
+    assert selected == ["google_genai:gemini-2.5-flash"]
+
+
 def test_analyze_returns_the_summary_and_the_tool_calls(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -198,7 +233,9 @@ def test_analyze_returns_the_summary_and_the_tool_calls(
     )
     manager = FakeManager(tools=_allowed_tools())
 
-    response = _agent_client(manager).post("/api/agent/analyze", json={"path": "/tmp"})
+    response = _agent_client(manager).post(
+        "/api/agent/analyze", json={"model": "openai-gpt", "path": "/tmp"}
+    )
 
     assert response.status_code == 200
     assert response.json() == {
@@ -220,7 +257,9 @@ def test_analyze_without_a_question_asks_about_the_path(
     model = _fake_model(monkeypatch, AIMessage(content="Nothing big here."))
     manager = FakeManager(tools=_allowed_tools())
 
-    response = _agent_client(manager).post("/api/agent/analyze", json={"path": "/tmp"})
+    response = _agent_client(manager).post(
+        "/api/agent/analyze", json={"model": "openai-gpt", "path": "/tmp"}
+    )
 
     assert response.status_code == 200
     assert response.json()["summary"] == "Nothing big here."
@@ -234,7 +273,8 @@ def test_analyze_sends_the_question_and_the_path_to_the_model(
     manager = FakeManager(tools=_allowed_tools())
 
     response = _agent_client(manager).post(
-        "/api/agent/analyze", json={"path": "/tmp", "question": "What is biggest?"}
+        "/api/agent/analyze",
+        json={"model": "openai-gpt", "path": "/tmp", "question": "What is biggest?"},
     )
 
     assert response.status_code == 200
@@ -249,7 +289,9 @@ def test_analyze_without_a_path_asks_about_the_default_location(
     model = _fake_model(monkeypatch, AIMessage(content="Nothing big here."))
     manager = FakeManager(tools=_allowed_tools())
 
-    response = _agent_client(manager).post("/api/agent/analyze", json={})
+    response = _agent_client(manager).post(
+        "/api/agent/analyze", json={"model": "openai-gpt"}
+    )
 
     assert response.status_code == 200
     assert response.json()["summary"] == "Nothing big here."
@@ -265,7 +307,8 @@ def test_analyze_with_only_a_question_keeps_the_question(
     manager = FakeManager(tools=_allowed_tools())
 
     response = _agent_client(manager).post(
-        "/api/agent/analyze", json={"question": "What is biggest?"}
+        "/api/agent/analyze",
+        json={"model": "openai-gpt", "question": "What is biggest?"},
     )
 
     assert response.status_code == 200
@@ -274,7 +317,9 @@ def test_analyze_with_only_a_question_keeps_the_question(
 
 
 def test_analyze_without_an_mcp_manager_returns_503(client: TestClient) -> None:
-    response = client.post("/api/agent/analyze", json={"path": "/tmp"})
+    response = client.post(
+        "/api/agent/analyze", json={"model": "openai-gpt", "path": "/tmp"}
+    )
 
     assert response.status_code == 503
     assert response.json() == {"detail": "MCP server is not available"}
@@ -296,7 +341,9 @@ def test_analyze_when_the_connection_breaks_returns_503(
         }
     )
 
-    response = _agent_client(manager).post("/api/agent/analyze", json={"path": "/tmp"})
+    response = _agent_client(manager).post(
+        "/api/agent/analyze", json={"model": "openai-gpt", "path": "/tmp"}
+    )
 
     assert response.status_code == 503
     assert "MCP pipe closed" in response.json()["detail"]
@@ -314,7 +361,9 @@ def test_analyze_when_the_step_cap_is_reached_returns_400(
     )
     manager = FakeManager(tools=_allowed_tools())
 
-    response = _agent_client(manager).post("/api/agent/analyze", json={"path": "/tmp"})
+    response = _agent_client(manager).post(
+        "/api/agent/analyze", json={"model": "openai-gpt", "path": "/tmp"}
+    )
 
     assert response.status_code == 400
     detail = response.json()["detail"]
@@ -331,7 +380,9 @@ def test_analyze_when_the_model_cannot_be_built_returns_503(
     monkeypatch.setattr(storage_agent, "init_chat_model", _boom)
     manager = FakeManager(tools=_allowed_tools())
 
-    response = _agent_client(manager).post("/api/agent/analyze", json={"path": "/tmp"})
+    response = _agent_client(manager).post(
+        "/api/agent/analyze", json={"model": "openai-gpt", "path": "/tmp"}
+    )
 
     assert response.status_code == 503
     detail = response.json()["detail"]
@@ -352,7 +403,9 @@ def test_analyze_never_binds_or_calls_trash_path(
     )
     manager = FakeManager(tools=tools)
 
-    response = _agent_client(manager).post("/api/agent/analyze", json={"path": "/tmp"})
+    response = _agent_client(manager).post(
+        "/api/agent/analyze", json={"model": "openai-gpt", "path": "/tmp"}
+    )
 
     assert response.status_code == 200
     body = response.json()

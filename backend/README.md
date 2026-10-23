@@ -114,7 +114,7 @@ Interactive API docs are served at `http://127.0.0.1:8000/docs`.
 | `GET /api/disk/count` | `count_files` | `path` (optional) |
 | `GET /api/disk/info` | `file_info` | `path` (optional) |
 | `GET /api/agent/models` | — | The selectable models; no MCP or provider key needed |
-| `POST /api/agent/analyze` | read-only agent | `{path?, question?}` → `{summary, tool_calls}` |
+| `POST /api/agent/analyze` | read-only agent | `{model, path?, question?}` → `{summary, tool_calls}` |
 | `POST /api/cleanup/execute` | `trash_path(confirm=True)` | `{paths: [...]}` — the only mutating route |
 
 `path` is optional on the disk routes: when it is omitted the request is
@@ -183,7 +183,11 @@ through a Pydantic response model.
 ]
 
 // POST /api/agent/analyze
-{ "path": "/Users/me/Downloads", "question": "What is taking the most space?" }
+{
+  "model": "openai-gpt",
+  "path": "/Users/me/Downloads",
+  "question": "What is taking the most space?"
+}
 
 // 200
 {
@@ -199,10 +203,11 @@ through a Pydantic response model.
 }
 ```
 
-`path` and `question` are both optional: without a path the agent starts from
-the default location, and without a question it looks for what takes the most
-space. A tool that reported an error is recorded with `status: "error"` — the
-agent carried on and answered anyway.
+`model` is required and must be an `id` from `GET /api/agent/models`; an
+unknown id is a 422. `path` and `question` are both optional: without a path
+the agent starts from the default location, and without a question it looks
+for what takes the most space. A tool that reported an error is recorded with
+`status: "error"` — the agent carried on and answered anyway.
 
 ### Cleanup
 
@@ -245,8 +250,10 @@ model cannot delete anything, no matter how the catalogue is built.
   LangGraph `recursion_limit`. It counts each model call *and* each tool call
   separately, so one round trip through a tool uses two steps. Hitting the cap
   raises `GraphRecursionError`, which the route turns into a 400.
-- The model is provider-agnostic: `init_chat_model` with the
-  `STORAGE_BACKEND_AGENT_MODEL` string (default `openai:gpt-4.1`) and
+- The model is selected per request from the hardcoded catalogue in
+  `agents/models.py` and validated in the route; it is not an environment
+  setting. The catalogue ids map to provider-agnostic `init_chat_model`
+  strings (`<provider>:<model_name>`) and are sent with
   `STORAGE_BACKEND_AGENT_TEMPERATURE` (default `0.0`). Three providers are
   installed and verified by `tests/test_provider_dependencies.py`:
   `openai:*` (`langchain-openai`), `ollama:*` (`langchain-ollama`), and
@@ -283,6 +290,7 @@ only an all-missing batch is a 400.
 | MCP tool returned an error | 400 | `{"detail": {"tool": "trash_path", "message": "Path not found: ..."}}` |
 | MCP server unavailable (connection or dependency) | 503 | `{"detail": "MCP server is not available"}` |
 | Agent hit its step limit | 400 | `{"detail": "The agent reached its step limit of 10 steps before it could answer."}` |
+| Agent model id is not in the catalogue | 422 | `{"detail": "Unsupported model 'x'. Choose one of: ..."}` |
 | Agent model could not be built | 503 | `{"detail": "Agent model is not available: ..."}` |
 | Request body invalid | 422 | FastAPI validation error |
 
@@ -301,7 +309,6 @@ started from the `backend/` directory.
 | `STORAGE_BACKEND_MCP_SERVER_COMMAND` | `storage-intelligence` | Console script launched via `uv run --directory <dir>` |
 | `STORAGE_BACKEND_MCP_SERVER_ARGS` | `[]` | Extra arguments for the command |
 | `STORAGE_BACKEND_MCP_REQUIRED` | `false` | When true, a failed MCP connection aborts startup instead of degrading |
-| `STORAGE_BACKEND_AGENT_MODEL` | `openai:gpt-4.1` | Provider-agnostic `init_chat_model` string |
 | `STORAGE_BACKEND_AGENT_TEMPERATURE` | `0.0` | Sampling temperature |
 | `STORAGE_BACKEND_AGENT_MAX_ITERATIONS` | `10` | Agent step limit (LangGraph `recursion_limit`) |
 | `STORAGE_BACKEND_CORS_ORIGINS` | `[]` | JSON array of allowed origins, e.g. `["http://localhost:5173"]` |
@@ -362,7 +369,7 @@ uv run pytest
 uv build
 ```
 
-58 tests cover the health routes, the disk routes, the agent endpoints (model
+60 tests cover the health routes, the disk routes, the agent endpoints (model
 catalogue and analysis) and the tool boundary, the storage agent, and the
 cleanup execution path. The suite
 runs with `asyncio_mode = "auto"` and carries an `integration` marker for

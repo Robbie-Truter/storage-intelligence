@@ -8,7 +8,7 @@ tools and reports both its answer and the tools it used.
 from fastapi import APIRouter, Depends, HTTPException, status
 from langgraph.errors import GraphRecursionError
 
-from ..agents.models import MODEL_CATALOG
+from ..agents.models import MODEL_CATALOG, find_model
 from ..agents.storage_agent import build_agent, run_readonly_analysis
 from ..config import get_settings
 from ..deps import get_mcp_manager
@@ -45,6 +45,8 @@ async def analyze(
 ) -> AgentAnalyzeResponse:
     """Analyze the storage usage under ``path`` with the read-only agent.
 
+    ``model`` is the ``id`` the client picked from ``GET /api/agent/models``;
+    it is validated against the hardcoded catalogue before anything is built.
     ``path`` is optional - without it the agent starts from the default
     location, which is where the MCP tools fall back to. ``question`` is
     optional too: without one the agent looks for what takes the most space.
@@ -57,14 +59,23 @@ async def analyze(
         200: the agent answered; the body carries its ``summary`` and the
             ``tool_calls`` it made.
         400: the agent used up its step limit before it could answer.
+        422: ``model`` is not in the catalogue.
         503: the MCP server is unavailable, or the chat model could not be
             constructed (for example, no provider key is configured).
     """
     settings = get_settings()
 
+    option = find_model(request.model)
+    if option is None:
+        supported = ", ".join(model.id for model in MODEL_CATALOG)
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"Unsupported model {request.model!r}. Choose one of: {supported}.",
+        )
+
     try:
         agent = build_agent(
-            model=settings.agent_model,
+            model=option.model_string,
             manager=manager,
             temperature=settings.agent_temperature,
             max_iterations=settings.agent_max_iterations,

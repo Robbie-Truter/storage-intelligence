@@ -11,6 +11,11 @@ class ModelOption:
     model_name: str
     mode: str
 
+    @property
+    def model_string(self) -> str:
+        """The provider-agnostic ``init_chat_model`` string."""
+        return f"{self.provider}:{self.model_name}"
+
 
 MODEL_CATALOG = [
     ModelOption(
@@ -35,3 +40,8 @@ MODEL_CATALOG = [
         mode="local",
     ),
 ]
+
+
+def find_model(model_id: str) -> ModelOption | None:
+    """Return the catalogue entry with ``model_id``, or ``None``."""
+    return next((option for option in MODEL_CATALOG if option.id == model_id), None)

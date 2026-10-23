@@ -117,11 +117,13 @@ class AgentModelOption(BaseModel):
 class AgentAnalyzeRequest(BaseModel):
     """Request body of ``POST /api/agent/analyze``.
 
-    ``path`` is the directory the agent investigates (defaults to the home
-    directory when omitted); ``question`` is optional and defaults to a general
-    "what takes the most space" analysis.
+    ``model`` is the ``id`` of a ``GET /api/agent/models`` entry and is
+    validated against that catalogue. ``path`` is the directory the agent
+    investigates (defaults to the home directory when omitted); ``question`` is
+    optional and defaults to a general "what takes the most space" analysis.
     """
 
+    model: str
     path: str | None = None
     question: str | None = None
 
