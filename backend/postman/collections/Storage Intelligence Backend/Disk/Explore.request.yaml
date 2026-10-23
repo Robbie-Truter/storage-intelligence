@@ -1,0 +1,4 @@
+$kind: http-request
+order: 3000
+method: GET
+url: "{{base_url}}/api/disk/explore?path=/Users/roberttruter/personal_projects"

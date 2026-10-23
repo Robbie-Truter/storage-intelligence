@@ -1,0 +1,10 @@
+$kind: collection
+name: Agent
+description: |-
+  LLM-driven agent endpoints (read-only tools only).
+  Uses LangChain; provider API keys are kept server-side.
+  Implemented: POST /api/agent/analyze - body {"path": "...", "question": "..."}
+  (question optional); returns {"summary": "...", "tool_calls": [{"name", "args", "status", "result"}]}.
+  503 when the MCP server is unavailable or the chat model cannot be built;
+  400 when the agent reaches its step limit.
+order: 3000

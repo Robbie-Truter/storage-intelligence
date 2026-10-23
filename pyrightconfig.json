@@ -1,9 +1,19 @@
 {
   "venvPath": ".",
   "venv": "mcp-server/.venv",
-  "extraPaths": ["mcp-server/src"],
-  "include": ["mcp-server/src", "mcp-server/tests"],
-  "exclude": ["mcp-server/dist", "**/__pycache__"],
+  "include": [
+    "mcp-server/src",
+    "mcp-server/tests",
+    "backend/src",
+    "backend/tests"
+  ],
+  "exclude": ["mcp-server/dist", "backend/dist", "**/__pycache__"],
   "pythonVersion": "3.13",
-  "typeCheckingMode": "basic"
+  "typeCheckingMode": "basic",
+  "extraPaths": [
+    "mcp-server/src",
+    "backend/src",
+    "backend/.venv/lib/python3.13/site-packages",
+    "backend/.venv/Lib/site-packages"
+  ]
 }

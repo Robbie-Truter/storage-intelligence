@@ -1,7 +1,4 @@
-"""Tests for trash_path (src/storage_intelligence/tools/cleanup.py:26).
-
-Implements plans/trash_path.md.
-"""
+"""Tests for trash_path (src/storage_intelligence_mcp/tools/cleanup.py)."""
 
 from pathlib import Path
 from typing import Any
@@ -10,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock, call
 import pytest
 from fastmcp.exceptions import ToolError
 
-from storage_intelligence.tools import cleanup
-from storage_intelligence.tools.cleanup import trash_path
+from storage_intelligence_mcp.tools import cleanup
+from storage_intelligence_mcp.tools.cleanup import trash_path
 
 # ===============================================
 # Fixtures
@@ -44,7 +41,7 @@ def trash(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
 
 
 # ===============================================
-# 2. Preview (default confirm=False)
+# Preview (default confirm=False)
 # ===============================================
 
 
@@ -64,7 +61,7 @@ async def test_preview_default_is_dry_run(
 
 
 # ===============================================
-# 3. Execute a single file
+# Execute
 # ===============================================
 
 
@@ -84,7 +81,7 @@ async def test_execute_single_file(
 
 
 # ===============================================
-# 4. `path` and `paths` equivalence
+# path and paths equivalence
 # ===============================================
 
 
@@ -125,7 +122,7 @@ async def test_no_targets_raises_tool_error(ctx: AsyncMock, trash: MagicMock) ->
 
 
 # ===============================================
-# 5. Deduplication
+# Deduplication
 # ===============================================
 
 
@@ -143,7 +140,7 @@ async def test_duplicate_path_collapses_to_one_target(
 
 
 # ===============================================
-# 6. Mixed batch: existing + missing
+# Mixed batch: existing + missing
 # ===============================================
 
 
@@ -163,7 +160,7 @@ async def test_mixed_batch_reports_missing_and_trashes_rest(
 
 
 # ===============================================
-# 7. All-missing batch
+# All-missing batch
 # ===============================================
 
 
@@ -181,7 +178,7 @@ async def test_all_missing_raises_tool_error(
 
 
 # ===============================================
-# 8. Empty list
+# Empty list
 # ===============================================
 
 
@@ -195,7 +192,7 @@ async def test_empty_list_raises_tool_error(ctx: AsyncMock, trash: MagicMock) ->
 
 
 # ===============================================
-# 9. Ordering: deepest first, alphabetical tie-break
+# Ordering: deepest first, alphabetical tie-break
 # ===============================================
 
 
@@ -228,7 +225,7 @@ async def test_equal_depth_tie_broken_alphabetically(
 
 
 # ===============================================
-# 10. Directory target trashed whole
+# Directory target trashed whole
 # ===============================================
 
 
@@ -245,7 +242,7 @@ async def test_directory_target_single_send2trash_call(
 
 
 # ===============================================
-# 11. Partial failure
+# Partial failure
 # ===============================================
 
 
@@ -274,7 +271,7 @@ async def test_partial_failure_partition_and_logging(
 
 
 # ===============================================
-# 12. total_valid_paths == len(paths) in both modes
+# total_valid_paths == len(paths) in both modes
 # ===============================================
 
 
@@ -296,7 +293,7 @@ async def test_total_valid_paths_matches_paths_in_both_modes(
 
 
 # ===============================================
-# 13. Outer error: Path.exists raising
+# Outer error: Path.exists raising
 # ===============================================
 
 
@@ -317,7 +314,7 @@ async def test_unexpected_error_when_exists_raises(
 
 
 # ===============================================
-# 14. ctx.warning includes the ignored-path count
+# ctx.warning includes the ignored-path count
 # ===============================================
 
 

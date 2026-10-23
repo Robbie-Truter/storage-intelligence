@@ -1,4 +1,4 @@
-"""Tests for count_files (src/storage_intelligence/tools/storage.py:173).
+"""Tests for count_files (src/storage_intelligence_mcp/tools/storage.py:173).
 
 Implements plans/count_files.md.
 """
@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock
 import pytest
 from fastmcp.exceptions import ToolError
 
-from storage_intelligence.tools.storage import count_files
+from storage_intelligence_mcp.tools.storage import count_files
 
 # ===============================================
 # Fixtures

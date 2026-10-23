@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ master ]
+    branches: [master, refactor/monorepo-structure]
   pull_request:
-    branches: [ master ]
+    branches: [master, refactor/monorepo-structure]
 
 # Cancel outdated workflow runs on open PR updates
 concurrency:
@@ -13,12 +13,17 @@ concurrency:
 
 jobs:
   ci:
-    name: Lint, Format, Type Check & Test
+    name: Lint, Format, Type Check & Test (${{ matrix.package }})
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [mcp-server, backend]
 
     defaults:
       run:
-        working-directory: mcp-server
+        working-directory: ${{ matrix.package }}
 
     steps:
       - name: Checkout repository
@@ -28,7 +33,7 @@ jobs:
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-          cache-dependency-glob: mcp-server/uv.lock
+          cache-dependency-glob: ${{ matrix.package }}/uv.lock
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install dependencies
@@ -41,7 +46,10 @@ jobs:
         run: uv run ruff format --check .
 
       - name: Pyright Type Check
-        run: uv run pyright
+        # Use the package's own pyproject.toml. A repo-root pyrightconfig.json
+        # exists for editors, but pyright would otherwise discover it and
+        # analyze both packages with a single virtualenv.
+        run: uv run pyright --project pyproject.toml
 
       - name: Pytest
         run: uv run pytest
@@ -49,5 +57,10 @@ jobs:
       - name: Build Package
         run: uv build
 
-      - name: Test Server Import
-        run: uv run python -c "from storage_intelligence.server import mcp; print('Server loads OK')"
+      - name: Test Server Import (mcp-server)
+        if: matrix.package == 'mcp-server'
+        run: uv run python -c "from storage_intelligence_mcp.server import mcp; print('Server loads OK')"
+
+      - name: Test App Import (backend)
+        if: matrix.package == 'backend'
+        run: uv run python -c "from storage_intelligence_backend.main import app; print('App loads OK')"

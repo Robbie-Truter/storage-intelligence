@@ -1,0 +1,6 @@
+name: Storage Intelligence - Local
+values:
+  - key: base_url
+    value: 'http://127.0.0.1:8000'
+    description: Base URL for the local development server (uv run storage-intelligence-backend)
+    enabled: true

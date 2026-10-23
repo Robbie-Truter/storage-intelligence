@@ -1,4 +1,4 @@
-"""Tests for directory_disk_usage (src/storage_intelligence/tools/storage.py:221).
+"""Tests for directory_disk_usage (src/storage_intelligence_mcp/tools/storage.py:221).
 
 Implements plans/directory_disk_usage.md.
 """
@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock
 import pytest
 from fastmcp.exceptions import ToolError
 
-from storage_intelligence.tools.storage import directory_disk_usage
+from storage_intelligence_mcp.tools.storage import directory_disk_usage
 
 # ===============================================
 # Fixtures

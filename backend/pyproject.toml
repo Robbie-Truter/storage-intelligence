@@ -1,0 +1,77 @@
+[project]
+name = "storage-intelligence-backend"
+version = "0.1.0"
+description = "FastAPI + LangChain backend for Storage Intelligence. Talks to the MCP server over MCP and exposes an HTTP API for the frontend."
+readme = "README.md"
+authors = [
+    { name = "Robbie-Truter", email = "timothylang6@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.143.0",
+    "uvicorn[standard]>=0.54.0",
+    "pydantic-settings>=2.10.0",
+    "langchain[mcp]>=1.4.0",
+    "langchain-openai>=1.0.0",
+    "langchain-ollama>=1.0.0",
+    "langchain-google-genai>=4.0.0",
+]
+
+[project.scripts]
+storage-intelligence-backend = "storage_intelligence_backend.main:run"
+
+
+[build-system]
+requires = ["uv_build>=0.12.10,<0.13.0"]
+build-backend = "uv_build"
+
+
+[dependency-groups]
+dev = [
+    "debugpy>=1.8.21",
+    "httpx>=0.28.0",
+    "pyright>=1.1.414",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.0.0",
+    "ruff>=0.16.7",
+]
+
+[tool.pyright]
+include = ["src", "tests"]
+exclude = ["dist", "**/__pycache__"]
+extraPaths = ["src"]
+pythonVersion = "3.13"
+typeCheckingMode = "basic"
+venvPath = "."
+venv = ".venv"
+
+[tool.ruff]
+target-version = "py313"
+line-length = 88
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # Pyflakes
+    "I",   # isort (import sorting)
+    "B",   # flake8-bugbear (common bugs/design issues)
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade (modern Python syntax)
+]
+ignore = ["F403"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+    "integration: tests that spawn the real MCP server over stdio",
+]

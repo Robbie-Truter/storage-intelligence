@@ -1,0 +1,15 @@
+$kind: collection
+name: Cleanup
+description: |-
+  Cleanup execution (v1).
+  POST /api/cleanup/execute takes {"paths": ["..."]} and passes the selected
+  paths straight to MCP trash_path(confirm=True), relying on the MCP tool's own
+  safeguards. There is no REST preview endpoint, no preview_id, no preview
+  store, and no client-supplied confirm - previewing happens through the MCP
+  preview_trash tool, reached by the agent.
+  Returns {"mode", "paths", "deleted", "failed", "missing_paths",
+  "total_valid_paths"}; 200 on success (a stale path in a mixed batch is
+  reported in missing_paths), 400 when every path is missing, 422 when the
+  body is not {"paths": [...]} with at least one path, 503 when the MCP server
+  is unavailable.
+order: 4000

@@ -1,4 +1,4 @@
-"""Tests for find_large_files (src/storage_intelligence/tools/storage.py:382).
+"""Tests for find_large_files (src/storage_intelligence_mcp/tools/storage.py:382).
 
 Implements plans/find_large_files.md.
 """
@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock
 import pytest
 from fastmcp.exceptions import ToolError
 
-from storage_intelligence.tools.storage import find_large_files
+from storage_intelligence_mcp.tools.storage import find_large_files
 
 MIB = 1024 * 1024
 

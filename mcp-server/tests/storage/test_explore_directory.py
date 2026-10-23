@@ -1,4 +1,4 @@
-"""Tests for explore_directory (src/storage_intelligence/tools/storage.py:89).
+"""Tests for explore_directory (src/storage_intelligence_mcp/tools/storage.py:89).
 
 Implements plans/explore_directory.md.
 """
@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock
 import pytest
 from fastmcp.exceptions import ToolError
 
-from storage_intelligence.tools.storage import explore_directory
+from storage_intelligence_mcp.tools.storage import explore_directory
 
 # ===============================================
 # Fixtures
@@ -51,7 +51,7 @@ def many_files(tmp_path: Path) -> Path:
 def entry(root: Path, rel: str, kind: Literal["file", "directory"]) -> dict[str, str]:
     """Build the expected `ExploreDirectoryEntry` for `rel` under `root`."""
     name = Path(rel).name
-    label = "directory " if kind == "directory" else "file "
+    label = "directory" if kind == "directory" else "file"
     return {"name": name, "path": str(root / rel), "type": label}
 
 

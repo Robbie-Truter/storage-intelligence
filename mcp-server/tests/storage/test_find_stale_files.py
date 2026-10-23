@@ -1,4 +1,4 @@
-"""Tests for find_stale_files (src/storage_intelligence/tools/storage.py:505).
+"""Tests for find_stale_files (src/storage_intelligence_mcp/tools/storage.py:505).
 
 Implements plans/find_stale_files.md.
 """
@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock
 import pytest
 from fastmcp.exceptions import ToolError
 
-from storage_intelligence.tools.storage import find_stale_files
+from storage_intelligence_mcp.tools.storage import find_stale_files
 
 # ===============================================
 # Fixtures
@@ -29,7 +29,7 @@ def ctx() -> AsyncMock:
 def tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """tmp_path with old.bin (100d old mtime) and recent.bin (10d old mtime)."""
     now = 1_000_000_000.0
-    monkeypatch.setattr("storage_intelligence.tools.storage.time.time", lambda: now)
+    monkeypatch.setattr("storage_intelligence_mcp.tools.storage.time.time", lambda: now)
 
     old = tmp_path / "old.bin"
     recent = tmp_path / "recent.bin"
@@ -69,7 +69,7 @@ async def test_boundary_exactly_at_threshold_excluded(
     ctx: AsyncMock, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     now = 1_000_000_000.0
-    monkeypatch.setattr("storage_intelligence.tools.storage.time.time", lambda: now)
+    monkeypatch.setattr("storage_intelligence_mcp.tools.storage.time.time", lambda: now)
 
     d = tmp_path / "d"
     d.mkdir()
@@ -92,7 +92,7 @@ async def test_boundary_one_day_over_included(
     ctx: AsyncMock, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     now = 1_000_000_000.0
-    monkeypatch.setattr("storage_intelligence.tools.storage.time.time", lambda: now)
+    monkeypatch.setattr("storage_intelligence_mcp.tools.storage.time.time", lambda: now)
 
     f = tmp_path / "barely.txt"
     f.write_text("x")
@@ -128,7 +128,7 @@ async def test_ordering_stalest_first_desc(
     ctx: AsyncMock, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     now = 1_000_000_000.0
-    monkeypatch.setattr("storage_intelligence.tools.storage.time.time", lambda: now)
+    monkeypatch.setattr("storage_intelligence_mcp.tools.storage.time.time", lambda: now)
 
     (tmp_path / "a.txt").write_text("x")
     (tmp_path / "b.txt").write_text("x")
@@ -154,7 +154,7 @@ async def test_max_results_caps_to_one_returning_stalest(
     ctx: AsyncMock, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     now = 1_000_000_000.0
-    monkeypatch.setattr("storage_intelligence.tools.storage.time.time", lambda: now)
+    monkeypatch.setattr("storage_intelligence_mcp.tools.storage.time.time", lambda: now)
 
     for name, d in [("a.txt", 300), ("b.txt", 100), ("c.txt", 50)]:
         p = tmp_path / name
@@ -191,7 +191,7 @@ async def test_recursive_finds_stale_in_subdirectory(
     ctx: AsyncMock, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     now = 1_000_000_000.0
-    monkeypatch.setattr("storage_intelligence.tools.storage.time.time", lambda: now)
+    monkeypatch.setattr("storage_intelligence_mcp.tools.storage.time.time", lambda: now)
 
     (tmp_path / "sub").mkdir()
     f = tmp_path / "sub" / "deep.txt"
@@ -213,7 +213,7 @@ async def test_unreadable_file_skipped_silently(
     ctx: AsyncMock, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     now = 1_000_000_000.0
-    monkeypatch.setattr("storage_intelligence.tools.storage.time.time", lambda: now)
+    monkeypatch.setattr("storage_intelligence_mcp.tools.storage.time.time", lambda: now)
 
     bad = tmp_path / "bad.txt"
     good = tmp_path / "good.txt"
