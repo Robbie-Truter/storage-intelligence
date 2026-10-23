@@ -15,8 +15,8 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 class Settings(BaseSettings):
     """Backend configuration.
 
-    Provider API keys are intentionally not modelled here; LangChain reads them
-    from the environment directly and they are never sent to the frontend.
+    Provider API keys are intentionally not modelled here; the client sends
+    the selected provider's key with each analysis request.
     """
 
     model_config = SettingsConfigDict(

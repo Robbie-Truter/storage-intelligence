@@ -5,6 +5,7 @@ and no LLM credentials are needed. The fake manager hands over a tool
 catalogue and the fake model answers with fixed replies.
 """
 
+from dataclasses import asdict
 from typing import Any
 
 import pytest
@@ -16,6 +17,7 @@ from langchain_core.tools import BaseTool, StructuredTool
 from pydantic import BaseModel, Field
 
 from storage_intelligence_backend.agents import storage_agent
+from storage_intelligence_backend.agents.models import MODEL_CATALOG
 from storage_intelligence_backend.config import Settings
 from storage_intelligence_backend.deps import get_mcp_manager
 from storage_intelligence_backend.main import create_app
@@ -162,30 +164,8 @@ def test_models_lists_the_catalog_without_mcp_or_credentials(
     response = client.get("/api/agent/models")
 
     assert response.status_code == 200
-    body = response.json()
-    assert body == [
-        {
-            "id": "openai-gpt",
-            "label": "OpenAI",
-            "provider": "openai",
-            "model_name": "gpt-4.1",
-            "mode": "cloud",
-        },
-        {
-            "id": "google-gemini",
-            "label": "Google Gemini",
-            "provider": "google_genai",
-            "model_name": "gemini-2.5-flash",
-            "mode": "cloud",
-        },
-        {
-            "id": "ollama-llama",
-            "label": "Llama 3.1 (Ollama)",
-            "provider": "ollama",
-            "model_name": "llama3.1",
-            "mode": "local",
-        },
-    ]
+    assert response.json() == [asdict(option) for option in MODEL_CATALOG]
+    assert response.json()
 
 
 def test_analyze_rejects_a_model_outside_the_catalog() -> None:
@@ -198,7 +178,7 @@ def test_analyze_rejects_a_model_outside_the_catalog() -> None:
     assert response.status_code == 422
     detail = response.json()["detail"]
     assert "not-a-model" in detail
-    assert "openai-gpt" in detail
+    assert "openai-gpt-4.1" in detail
 
 
 def test_analyze_uses_the_model_selected_in_the_body(
@@ -206,9 +186,11 @@ def test_analyze_uses_the_model_selected_in_the_body(
 ) -> None:
     fake_model = FakeChatModel(messages=iter([AIMessage(content="Nothing big here.")]))
     selected: list[str] = []
+    captured: dict[str, Any] = {}
 
-    def _init_chat_model(model: str, **_kwargs: Any) -> FakeChatModel:
+    def _init_chat_model(model: str, **kwargs: Any) -> FakeChatModel:
         selected.append(model)
+        captured.update(kwargs)
         return fake_model
 
     monkeypatch.setattr(storage_agent, "init_chat_model", _init_chat_model)
@@ -216,11 +198,50 @@ def test_analyze_uses_the_model_selected_in_the_body(
 
     response = _agent_client(manager).post(
         "/api/agent/analyze",
-        json={"model": "google-gemini", "path": "/tmp"},
+        json={
+            "model": "google-gemini-2.5-flash",
+            "api_key": "client-key",
+            "path": "/tmp",
+        },
     )
 
     assert response.status_code == 200
     assert selected == ["google_genai:gemini-2.5-flash"]
+    assert captured["api_key"] == "client-key"
+
+
+def test_analyze_requires_an_api_key_for_cloud_models() -> None:
+    manager = FakeManager(tools=_allowed_tools())
+
+    response = _agent_client(manager).post(
+        "/api/agent/analyze", json={"model": "openai-gpt-4.1"}
+    )
+
+    assert response.status_code == 422
+    assert "api_key" in response.json()["detail"]
+
+
+def test_analyze_allows_ollama_without_an_api_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_model = FakeChatModel(messages=iter([AIMessage(content="Nothing big here.")]))
+    captured: dict[str, Any] = {}
+
+    def _init_chat_model(model: str, **kwargs: Any) -> FakeChatModel:
+        captured["model"] = model
+        captured.update(kwargs)
+        return fake_model
+
+    monkeypatch.setattr(storage_agent, "init_chat_model", _init_chat_model)
+    manager = FakeManager(tools=_allowed_tools())
+
+    response = _agent_client(manager).post(
+        "/api/agent/analyze", json={"model": "ollama-llama3.1", "path": "/tmp"}
+    )
+
+    assert response.status_code == 200
+    assert captured["model"] == "ollama:llama3.1"
+    assert "api_key" not in captured
 
 
 def test_analyze_returns_the_summary_and_the_tool_calls(
@@ -234,7 +255,8 @@ def test_analyze_returns_the_summary_and_the_tool_calls(
     manager = FakeManager(tools=_allowed_tools())
 
     response = _agent_client(manager).post(
-        "/api/agent/analyze", json={"model": "openai-gpt", "path": "/tmp"}
+        "/api/agent/analyze",
+        json={"model": "openai-gpt-4.1", "api_key": "test-key", "path": "/tmp"},
     )
 
     assert response.status_code == 200
@@ -258,7 +280,8 @@ def test_analyze_without_a_question_asks_about_the_path(
     manager = FakeManager(tools=_allowed_tools())
 
     response = _agent_client(manager).post(
-        "/api/agent/analyze", json={"model": "openai-gpt", "path": "/tmp"}
+        "/api/agent/analyze",
+        json={"model": "openai-gpt-4.1", "api_key": "test-key", "path": "/tmp"},
     )
 
     assert response.status_code == 200
@@ -274,7 +297,12 @@ def test_analyze_sends_the_question_and_the_path_to_the_model(
 
     response = _agent_client(manager).post(
         "/api/agent/analyze",
-        json={"model": "openai-gpt", "path": "/tmp", "question": "What is biggest?"},
+        json={
+            "model": "openai-gpt-4.1",
+            "api_key": "test-key",
+            "path": "/tmp",
+            "question": "What is biggest?",
+        },
     )
 
     assert response.status_code == 200
@@ -290,7 +318,7 @@ def test_analyze_without_a_path_asks_about_the_default_location(
     manager = FakeManager(tools=_allowed_tools())
 
     response = _agent_client(manager).post(
-        "/api/agent/analyze", json={"model": "openai-gpt"}
+        "/api/agent/analyze", json={"model": "openai-gpt-4.1", "api_key": "test-key"}
     )
 
     assert response.status_code == 200
@@ -308,7 +336,11 @@ def test_analyze_with_only_a_question_keeps_the_question(
 
     response = _agent_client(manager).post(
         "/api/agent/analyze",
-        json={"model": "openai-gpt", "question": "What is biggest?"},
+        json={
+            "model": "openai-gpt-4.1",
+            "api_key": "test-key",
+            "question": "What is biggest?",
+        },
     )
 
     assert response.status_code == 200
@@ -318,7 +350,8 @@ def test_analyze_with_only_a_question_keeps_the_question(
 
 def test_analyze_without_an_mcp_manager_returns_503(client: TestClient) -> None:
     response = client.post(
-        "/api/agent/analyze", json={"model": "openai-gpt", "path": "/tmp"}
+        "/api/agent/analyze",
+        json={"model": "openai-gpt-4.1", "api_key": "test-key", "path": "/tmp"},
     )
 
     assert response.status_code == 503
@@ -342,7 +375,8 @@ def test_analyze_when_the_connection_breaks_returns_503(
     )
 
     response = _agent_client(manager).post(
-        "/api/agent/analyze", json={"model": "openai-gpt", "path": "/tmp"}
+        "/api/agent/analyze",
+        json={"model": "openai-gpt-4.1", "api_key": "test-key", "path": "/tmp"},
     )
 
     assert response.status_code == 503
@@ -362,7 +396,8 @@ def test_analyze_when_the_step_cap_is_reached_returns_400(
     manager = FakeManager(tools=_allowed_tools())
 
     response = _agent_client(manager).post(
-        "/api/agent/analyze", json={"model": "openai-gpt", "path": "/tmp"}
+        "/api/agent/analyze",
+        json={"model": "openai-gpt-4.1", "api_key": "test-key", "path": "/tmp"},
     )
 
     assert response.status_code == 400
@@ -381,7 +416,8 @@ def test_analyze_when_the_model_cannot_be_built_returns_503(
     manager = FakeManager(tools=_allowed_tools())
 
     response = _agent_client(manager).post(
-        "/api/agent/analyze", json={"model": "openai-gpt", "path": "/tmp"}
+        "/api/agent/analyze",
+        json={"model": "openai-gpt-4.1", "api_key": "test-key", "path": "/tmp"},
     )
 
     assert response.status_code == 503
@@ -404,7 +440,8 @@ def test_analyze_never_binds_or_calls_trash_path(
     manager = FakeManager(tools=tools)
 
     response = _agent_client(manager).post(
-        "/api/agent/analyze", json={"model": "openai-gpt", "path": "/tmp"}
+        "/api/agent/analyze",
+        json={"model": "openai-gpt-4.1", "api_key": "test-key", "path": "/tmp"},
     )
 
     assert response.status_code == 200

@@ -6,7 +6,7 @@ count, info), the agent payloads, and the cleanup payloads are defined here.
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 
 class HealthResponse(BaseModel):
@@ -118,12 +118,15 @@ class AgentAnalyzeRequest(BaseModel):
     """Request body of ``POST /api/agent/analyze``.
 
     ``model`` is the ``id`` of a ``GET /api/agent/models`` entry and is
-    validated against that catalogue. ``path`` is the directory the agent
-    investigates (defaults to the home directory when omitted); ``question`` is
-    optional and defaults to a general "what takes the most space" analysis.
+    validated against that catalogue. ``api_key`` is the selected provider's
+    key, supplied by the client; it is required for cloud providers and unused
+    for Ollama. ``path`` is the directory the agent investigates (defaults to
+    the home directory when omitted); ``question`` is optional and defaults to
+    a general "what takes the most space" analysis.
     """
 
     model: str
+    api_key: SecretStr | None = None
     path: str | None = None
     question: str | None = None
 

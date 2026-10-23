@@ -22,6 +22,8 @@ def build_agent(
     manager: StorageMCPClient,
     temperature: float,
     max_iterations: int,
+    *,
+    api_key: str | None = None,
 ) -> Any:
     """Build a read-only agent from the tools the manager offers.
 
@@ -30,15 +32,18 @@ def build_agent(
     included - are bound to the model, and the raw ``trash_path`` tool is
     never among them.
 
+    ``api_key`` is the client-supplied provider key; it is passed to the
+    provider constructor when given and is never stored.
+
     ``max_iterations`` caps how many times the agent may loop: ask the model,
     run a tool, ask again. The cap counts each of those steps separately, so
     one round trip through a tool uses two of them. When the cap is reached
     the run stops with ``GraphRecursionError`` instead of looping forever.
     """
-    llm = init_chat_model(
-        model,
-        temperature=temperature,
-    )
+    if api_key:
+        llm = init_chat_model(model, temperature=temperature, api_key=api_key)
+    else:
+        llm = init_chat_model(model, temperature=temperature)
 
     tools = list(manager.langchain_tools.values())
 

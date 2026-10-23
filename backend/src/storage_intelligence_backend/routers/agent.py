@@ -47,7 +47,9 @@ async def analyze(
 
     ``model`` is the ``id`` the client picked from ``GET /api/agent/models``;
     it is validated against the hardcoded catalogue before anything is built.
-    ``path`` is optional - without it the agent starts from the default
+    ``api_key`` is the client-supplied key for that provider (required for
+    cloud models, unused for Ollama). ``path`` is optional - without it the
+    agent starts from the default
     location, which is where the MCP tools fall back to. ``question`` is
     optional too: without one the agent looks for what takes the most space.
 
@@ -59,18 +61,28 @@ async def analyze(
         200: the agent answered; the body carries its ``summary`` and the
             ``tool_calls`` it made.
         400: the agent used up its step limit before it could answer.
-        422: ``model`` is not in the catalogue.
+        422: ``model`` is not in the catalogue, or ``api_key`` is missing for a
+            cloud provider.
         503: the MCP server is unavailable, or the chat model could not be
-            constructed (for example, no provider key is configured).
+            constructed (for example, its provider integration failed to load).
     """
     settings = get_settings()
 
     option = find_model(request.model)
+
     if option is None:
         supported = ", ".join(model.id for model in MODEL_CATALOG)
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"Unsupported model {request.model!r}. Choose one of: {supported}.",
+        )
+
+    api_key = request.api_key.get_secret_value() if request.api_key else None
+
+    if option.provider != "ollama" and not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"api_key is required for the {option.provider} provider.",
         )
 
     try:
@@ -79,6 +91,7 @@ async def analyze(
             manager=manager,
             temperature=settings.agent_temperature,
             max_iterations=settings.agent_max_iterations,
+            api_key=api_key if option.provider != "ollama" else None,
         )
     except Exception as exc:
         raise HTTPException(

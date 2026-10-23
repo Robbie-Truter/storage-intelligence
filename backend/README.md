@@ -4,10 +4,10 @@ A FastAPI service that talks to the Storage Intelligence **MCP server** over MCP
 and exposes an HTTP API for the frontend, plus an optional read-only LLM
 analysis agent.
 
-Provider API keys live on the backend only and are never sent to the client.
-The service runs locally: it launches the MCP server as a child process over
-stdio and shares that one connection between the deterministic REST routes and
-the agent.
+The client supplies the provider API key with each analysis request; the
+backend never stores it. The service runs locally: it launches the MCP server
+as a child process over stdio and shares that one connection between the
+deterministic REST routes and the agent.
 
 This is the `backend/` package of the Storage Intelligence monorepo. The
 project overview lives in the [root README](../README.md); the server this
@@ -160,21 +160,21 @@ through a Pydantic response model.
 // GET /api/agent/models
 [
   {
-    "id": "openai-gpt",
-    "label": "OpenAI",
+    "id": "openai-gpt-4.1",
+    "label": "GPT-4.1",
     "provider": "openai",
     "model_name": "gpt-4.1",
     "mode": "cloud"
   },
   {
-    "id": "google-gemini",
-    "label": "Google Gemini",
+    "id": "google-gemini-2.5-flash",
+    "label": "Gemini 2.5 Flash",
     "provider": "google_genai",
     "model_name": "gemini-2.5-flash",
     "mode": "cloud"
   },
   {
-    "id": "ollama-llama",
+    "id": "ollama-llama3.1",
     "label": "Llama 3.1 (Ollama)",
     "provider": "ollama",
     "model_name": "llama3.1",
@@ -184,7 +184,8 @@ through a Pydantic response model.
 
 // POST /api/agent/analyze
 {
-  "model": "openai-gpt",
+  "model": "openai-gpt-4.1",
+  "api_key": "sk-...",
   "path": "/Users/me/Downloads",
   "question": "What is taking the most space?"
 }
@@ -204,9 +205,11 @@ through a Pydantic response model.
 ```
 
 `model` is required and must be an `id` from `GET /api/agent/models`; an
-unknown id is a 422. `path` and `question` are both optional: without a path
-the agent starts from the default location, and without a question it looks
-for what takes the most space. A tool that reported an error is recorded with
+unknown id is a 422. `api_key` is the selected provider's key and is required
+for cloud models (Ollama needs none); it is used for that one request and never
+stored. `path` and `question` are both optional: without a path the agent
+starts from the default location, and without a question it looks for what
+takes the most space. A tool that reported an error is recorded with
 `status: "error"` — the agent carried on and answered anyway.
 
 ### Cleanup
@@ -291,6 +294,7 @@ only an all-missing batch is a 400.
 | MCP server unavailable (connection or dependency) | 503 | `{"detail": "MCP server is not available"}` |
 | Agent hit its step limit | 400 | `{"detail": "The agent reached its step limit of 10 steps before it could answer."}` |
 | Agent model id is not in the catalogue | 422 | `{"detail": "Unsupported model 'x'. Choose one of: ..."}` |
+| Cloud model used without `api_key` | 422 | `{"detail": "api_key is required for the openai provider."}` |
 | Agent model could not be built | 503 | `{"detail": "Agent model is not available: ..."}` |
 | Request body invalid | 422 | FastAPI validation error |
 
@@ -313,11 +317,10 @@ started from the `backend/` directory.
 | `STORAGE_BACKEND_AGENT_MAX_ITERATIONS` | `10` | Agent step limit (LangGraph `recursion_limit`) |
 | `STORAGE_BACKEND_CORS_ORIGINS` | `[]` | JSON array of allowed origins, e.g. `["http://localhost:5173"]` |
 
-Provider API keys are **not** modelled in `Settings`: LangChain reads them from
-the environment directly and they never reach the frontend. Use
-`OPENAI_API_KEY` for `openai:*`, `GOOGLE_API_KEY` for `google_genai:*`, and
-`OLLAMA_BASE_URL` (default `http://localhost:11434`) for `ollama:*`; Ollama
-needs no key.
+Provider API keys are **not** modelled in `Settings`: the client supplies the
+selected provider's key as `api_key` in the `/api/agent/analyze` request body.
+The backend passes it to the model for that request only and never stores or
+returns it. Ollama runs locally and needs no key.
 
 On startup the lifespan opens the MCP connection. If it fails, the app starts
 in **degraded mode** (readiness reports it) unless `STORAGE_BACKEND_MCP_REQUIRED`
@@ -331,7 +334,7 @@ is set, in which case startup fails.
 
 - Python 3.13+
 - [`uv`](https://github.com/astral-sh/uv)
-- A provider API key for the agent (only needed for `/api/agent/analyze`)
+- A provider API key for cloud models, supplied in the `/api/agent/analyze` body
 
 ### Setup
 
@@ -369,9 +372,9 @@ uv run pytest
 uv build
 ```
 
-60 tests cover the health routes, the disk routes, the agent endpoints (model
-catalogue and analysis) and the tool boundary, the storage agent, and the
-cleanup execution path. The suite
+62 tests cover the health routes, the disk routes, the agent endpoints (model
+catalogue and analysis), the client-supplied key handling and tool boundary,
+the storage agent, and the cleanup execution path. The suite
 runs with `asyncio_mode = "auto"` and carries an `integration` marker for
 tests that spawn the real MCP server over stdio.
 

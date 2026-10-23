@@ -157,8 +157,8 @@ uv run storage-intelligence      # stdio transport
 ## Backend (`backend/`)
 
 FastAPI service that speaks MCP to the server above and exposes HTTP for the
-frontend. Provider API keys live on the backend only and are never sent to the
-client.
+frontend. The client supplies the provider API key with each agent request; the
+backend uses it for that request and never stores it.
 
 ### Endpoints
 
@@ -171,14 +171,15 @@ client.
 | `GET /api/disk/explore` | `explore_directory` | `path`, `pattern`, `search`, `kind`, `recursive`, `max_results` |
 | `GET /api/disk/count` | `count_files` | `path` |
 | `GET /api/disk/info` | `file_info` | `path` |
-| `POST /api/agent/analyze` | read-only agent | `{path?, question?}` → `{summary, tool_calls}` |
+| `POST /api/agent/analyze` | read-only agent | `{model, api_key?, path?, question?}` → `{summary, tool_calls}` |
 | `POST /api/cleanup/execute` | `trash_path(confirm=True)` | `{paths: [...]}` — the only mutating route |
 
 Interactive API docs are served at `http://127.0.0.1:8000/docs`.
 
 Error mapping: an MCP tool error becomes **400** with the MCP message, an
-unavailable MCP server becomes **503**, and an agent that hits its step cap
-becomes **400**.
+unavailable MCP server becomes **503**, an agent that hits its step cap becomes
+**400**, and an unknown model or a cloud model without an `api_key` becomes
+**422**.
 
 ### Read-only agent
 
@@ -188,8 +189,9 @@ tool. `trash_path` is not on the list, so the model cannot delete anything, no
 matter how the catalogue is built. The allowlist lives in one place
 (`mcp/manager.py`) and is applied on every read of the tool map.
 
-The agent is built **per request** from the injected manager, so a missing
-provider key cannot stop the app from booting. Each `tool_calls` entry carries
+The agent is built **per request** from the injected manager, so a missing or
+invalid provider key only fails that request. Cloud models require the client
+to send `api_key`; Ollama does not. Each `tool_calls` entry carries
 `{name, args, status, result}`.
 
 ### Cleanup safety model
@@ -220,18 +222,19 @@ template).
 | `STORAGE_BACKEND_MCP_SERVER_COMMAND` | `storage-intelligence` | Console script launched over stdio |
 | `STORAGE_BACKEND_MCP_SERVER_ARGS` | `[]` | Extra arguments for the server |
 | `STORAGE_BACKEND_MCP_REQUIRED` | `false` | Fail startup when MCP is unreachable (otherwise degraded mode) |
-| `STORAGE_BACKEND_AGENT_MODEL` | `openai:gpt-4.1` | Provider-agnostic `init_chat_model` string |
 | `STORAGE_BACKEND_AGENT_TEMPERATURE` | `0.0` | Sampling temperature |
 | `STORAGE_BACKEND_AGENT_MAX_ITERATIONS` | `10` | Agent step cap (a cap hit is a 400) |
 | `STORAGE_BACKEND_CORS_ORIGINS` | `[]` | Allowed origins for the frontend |
-| `OPENAI_API_KEY` | — | Provider key; backend only, never exposed to the client |
+
+The model is picked per request from `GET /api/agent/models`; provider keys are
+sent by the client in the analyze body and are not backend settings.
 
 ### Run it
 
 ```bash
 cd backend
 uv sync
-cp .env.example .env        # add your provider key if you want the agent
+cp .env.example .env        # optional local overrides
 uv run storage-intelligence-backend    # http://127.0.0.1:8000
 ```
 
