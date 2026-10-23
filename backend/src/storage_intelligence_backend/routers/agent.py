@@ -1,5 +1,6 @@
 """LLM-driven agent endpoints (read-only tools only).
 
+``GET /api/agent/models`` lists the models the agent can be configured with.
 ``POST /api/agent/analyze`` runs the read-only agent over the allowlisted MCP
 tools and reports both its answer and the tools it used.
 """
@@ -7,13 +8,34 @@ tools and reports both its answer and the tools it used.
 from fastapi import APIRouter, Depends, HTTPException, status
 from langgraph.errors import GraphRecursionError
 
+from ..agents.models import MODEL_CATALOG
 from ..agents.storage_agent import build_agent, run_readonly_analysis
 from ..config import get_settings
 from ..deps import get_mcp_manager
 from ..mcp.manager import StorageMCPClient
-from ..schemas import AgentAnalyzeRequest, AgentAnalyzeResponse
+from ..schemas import AgentAnalyzeRequest, AgentAnalyzeResponse, AgentModelOption
 
 router = APIRouter(prefix="/agent", tags=["agent"])
+
+
+@router.get("/models", response_model=list[AgentModelOption])
+async def list_models() -> list[AgentModelOption]:
+    """List the model options the agent can be configured with.
+
+    The catalogue is static and needs neither the MCP server nor a provider
+    key, so the frontend can build a model picker before anything is
+    configured.
+    """
+    return [
+        AgentModelOption(
+            id=option.id,
+            label=option.label,
+            provider=option.provider,
+            model_name=option.model_name,
+            mode=option.mode,
+        )
+        for option in MODEL_CATALOG
+    ]
 
 
 @router.post("/analyze", response_model=AgentAnalyzeResponse)

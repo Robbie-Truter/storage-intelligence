@@ -100,6 +100,20 @@ class ReadinessResponse(BaseModel):
     detail: str | None = None
 
 
+class AgentModelOption(BaseModel):
+    """One model the agent can be configured with.
+
+    ``provider`` is the ``init_chat_model`` provider prefix, ``model_name`` the
+    provider-specific model, and ``mode`` is ``cloud`` or ``local``.
+    """
+
+    id: str
+    label: str
+    provider: str
+    model_name: str
+    mode: str
+
+
 class AgentAnalyzeRequest(BaseModel):
     """Request body of ``POST /api/agent/analyze``.
 

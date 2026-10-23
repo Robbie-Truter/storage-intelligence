@@ -85,6 +85,7 @@ backend/
 │   │   ├── manager.py        # StorageMCPClient: client + adapter + allowlist
 │   │   └── errors.py         # MCPError, MCPUnavailable, MCPToolError
 │   ├── agents/
+│   │   ├── models.py         # MODEL_CATALOG: the selectable models
 │   │   └── storage_agent.py  # build_agent(...) + run_readonly_analysis(...)
 │   ├── cleanup/
 │   │   └── preview_store.py  # unused scaffolding; v1 has no preview store
@@ -112,6 +113,7 @@ Interactive API docs are served at `http://127.0.0.1:8000/docs`.
 | `GET /api/disk/explore` | `explore_directory` | `path` (optional), `pattern`, `search`, `kind`, `recursive`, `max_results` |
 | `GET /api/disk/count` | `count_files` | `path` (optional) |
 | `GET /api/disk/info` | `file_info` | `path` (optional) |
+| `GET /api/agent/models` | — | The selectable models; no MCP or provider key needed |
 | `POST /api/agent/analyze` | read-only agent | `{path?, question?}` → `{summary, tool_calls}` |
 | `POST /api/cleanup/execute` | `trash_path(confirm=True)` | `{paths: [...]}` — the only mutating route |
 
@@ -155,6 +157,31 @@ through a Pydantic response model.
 ### Agent
 
 ```jsonc
+// GET /api/agent/models
+[
+  {
+    "id": "openai-gpt",
+    "label": "OpenAI",
+    "provider": "openai",
+    "model_name": "gpt-4.1",
+    "mode": "cloud"
+  },
+  {
+    "id": "google-gemini",
+    "label": "Google Gemini",
+    "provider": "google_genai",
+    "model_name": "gemini-2.5-flash",
+    "mode": "cloud"
+  },
+  {
+    "id": "ollama-llama",
+    "label": "Llama 3.1 (Ollama)",
+    "provider": "ollama",
+    "model_name": "llama3.1",
+    "mode": "local"
+  }
+]
+
 // POST /api/agent/analyze
 { "path": "/Users/me/Downloads", "question": "What is taking the most space?" }
 
@@ -335,8 +362,9 @@ uv run pytest
 uv build
 ```
 
-54 tests cover the health routes, the disk routes, the agent endpoint and its
-tool boundary, the storage agent, and the cleanup execution path. The suite
+58 tests cover the health routes, the disk routes, the agent endpoints (model
+catalogue and analysis) and the tool boundary, the storage agent, and the
+cleanup execution path. The suite
 runs with `asyncio_mode = "auto"` and carries an `integration` marker for
 tests that spawn the real MCP server over stdio.
 

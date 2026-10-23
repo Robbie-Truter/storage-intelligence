@@ -156,6 +156,38 @@ def _agent_client(fake_manager: FakeManager) -> TestClient:
     return TestClient(app)
 
 
+def test_models_lists_the_catalog_without_mcp_or_credentials(
+    client: TestClient,
+) -> None:
+    response = client.get("/api/agent/models")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body == [
+        {
+            "id": "openai-gpt",
+            "label": "OpenAI",
+            "provider": "openai",
+            "model_name": "gpt-4.1",
+            "mode": "cloud",
+        },
+        {
+            "id": "google-gemini",
+            "label": "Google Gemini",
+            "provider": "google_genai",
+            "model_name": "gemini-2.5-flash",
+            "mode": "cloud",
+        },
+        {
+            "id": "ollama-llama",
+            "label": "Llama 3.1 (Ollama)",
+            "provider": "ollama",
+            "model_name": "llama3.1",
+            "mode": "local",
+        },
+    ]
+
+
 def test_analyze_returns_the_summary_and_the_tool_calls(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
