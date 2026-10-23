@@ -162,7 +162,7 @@ async def explore_directory(
                 truncated = True
                 break
 
-            prefix = "directory " if is_dir else "file "
+            prefix = "directory" if is_dir else "file"
             entry_name = child.relative_to(p) if recursive else child.name
             entries.append(
                 {
