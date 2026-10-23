@@ -51,7 +51,7 @@ def many_files(tmp_path: Path) -> Path:
 def entry(root: Path, rel: str, kind: Literal["file", "directory"]) -> dict[str, str]:
     """Build the expected `ExploreDirectoryEntry` for `rel` under `root`."""
     name = Path(rel).name
-    label = "directory " if kind == "directory" else "file "
+    label = "directory" if kind == "directory" else "file"
     return {"name": name, "path": str(root / rel), "type": label}
 
 

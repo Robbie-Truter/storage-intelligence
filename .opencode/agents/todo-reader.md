@@ -37,7 +37,7 @@ ACCEPTANCE:
   - <behavior or test that must hold>
 VERIFY:
   - <pkg dir> && uv run ruff check --fix && uv run ruff format
-  - <pkg dir> && uv run pyright
+  - <pkg dir> && uv run pyright --project pyproject.toml
   - <pkg dir> && uv run pytest <target>
 RISKS: <real ones, else "none">
 ```

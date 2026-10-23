@@ -80,8 +80,11 @@ own `.venv`.
 - **Verification Commands** (run all from the package directory — `mcp-server/` or `backend/` — before considering a task complete):
   - `uv run ruff check --fix`
   - `uv run ruff format`
-  - `uv run pyright`
+  - `uv run pyright --project pyproject.toml`
   - `uv run pytest`
+
+> A repo-root `pyrightconfig.json` exists only so editors can type-check the whole workspace. `--project pyproject.toml`
+> is required for CLI runs; otherwise Pyright discovers the root config and checks both packages with one virtualenv.
 
 ## MCP Servers
 
