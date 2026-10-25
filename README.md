@@ -3,21 +3,29 @@
 **Storage Intelligence** is a local-first monorepo for storage analysis, disk
 usage profiling, duplicate and junk detection, and safe cleanup workflows.
 
-It is made of two Python packages and a frontend that is still a placeholder:
+It is made of two Python packages and a planned React frontend that has not been
+scaffolded yet:
 
 - **`mcp-server/`** — a [FastMCP](https://gofastmcp.com) server exposing
   structured tools, a resource, and prompts for local storage analysis and
   safe cleanup.
 - **`backend/`** — a FastAPI + LangChain service that talks to the MCP server
   over MCP and exposes an HTTP API, including an optional read-only LLM agent.
-- **`frontend/`** — the React dashboard (placeholder).
+- **`frontend/`** — the planned React + Vite dashboard: storage overview,
+  read-only AI assistant, settings, and a shared cleanup review. The build
+  contract is [`frontend/FRONTEND_HANDOFF.md`](frontend/FRONTEND_HANDOFF.md);
+  the work is tracked in [`frontend-todo.md`](frontend-todo.md).
 
 > **Documentation map.** This README is the **project overview**: architecture,
 > the HTTP API, CI, and the shared workflow. Each package carries its own
 > README with the detailed reference —
 > [`mcp-server/README.md`](mcp-server/README.md) (every tool, prompt, and
 > result shape) and [`backend/README.md`](backend/README.md) (every endpoint,
-> setting, and test suite). The other tracked documents are
+> setting, and test suite). The frontend uses
+> [`frontend/FRONTEND_HANDOFF.md`](frontend/FRONTEND_HANDOFF.md) as its approved
+> build snapshot and [`frontend-todo.md`](frontend-todo.md) as its ordered
+> checklist; a durable `frontend/README.md` is added in the final frontend
+> phase. The other tracked documents are
 > [`AGENTS.md`](AGENTS.md) (repo-wide rules for coding agents) and
 > [`BACKEND_HANDOFF.md`](BACKEND_HANDOFF.md) (backend design decisions and
 > roadmap).
@@ -28,8 +36,8 @@ It is made of two Python packages and a frontend that is still a placeholder:
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│                      Frontend (React dashboard)                   │
-│                      placeholder — not built yet                 │
+│                Frontend — React + Vite (planned)                 │
+│           Home · Assistant · Settings · Cleanup review           │
 └───────────────────────────────┬──────────────────────────────────┘
                                 │ HTTP / JSON
                                 ▼
@@ -87,9 +95,12 @@ storage-intelligence/
 │   │   └── routers/       # health.py · disk.py · agent.py · cleanup.py
 │   ├── postman/           # Postman collection, environment, and specs
 │   └── tests/
-├── frontend/              # React dashboard — placeholder
+├── frontend/              # React + Vite dashboard (planned; not scaffolded yet)
+│   ├── FRONTEND_HANDOFF.md  # approved frontend build snapshot
+│   └── README.md          # durable setup/run docs (added in the final phase)
+├── frontend-todo.md       # ordered frontend implementation checklist
 ├── .opencode/             # opencode agents, commands, and skills
-├── .github/workflows/     # CI (mcp-server + backend matrix)
+├── .github/workflows/     # CI (mcp-server + backend matrix; frontend job pending)
 ├── AGENTS.md              # repo-wide rules for coding agents
 └── BACKEND_HANDOFF.md     # backend design decisions and roadmap
 ```
@@ -240,6 +251,72 @@ uv run storage-intelligence-backend    # http://127.0.0.1:8000
 
 ---
 
+## Frontend (`frontend/`)
+
+The frontend is a planned React dashboard; the app has not been scaffolded yet.
+[`frontend/FRONTEND_HANDOFF.md`](frontend/FRONTEND_HANDOFF.md) is the approved
+build snapshot, and [`frontend-todo.md`](frontend-todo.md) is the ordered
+implementation checklist.
+
+### Stack
+
+React + Vite + TypeScript (strict), Tailwind CSS v4 via `@tailwindcss/vite`,
+shadcn/ui (New York style, CSS variables), React Router, TanStack Query, Axios,
+Framer Motion, and lucide-react. npm is the package manager.
+
+### Routes
+
+| Route | Page | Purpose |
+| ----- | ---- | ------- |
+| `/` | Home | Read-only disk overview: readiness, path context, volume usage, largest immediate children, extension counts, and selected-entry metadata |
+| `/assistant` | AI Assistant | One-shot analysis over the read-only agent, with a complete tool-call timeline |
+| `/settings` | Settings | Theme, model selection, in-memory provider keys, and privacy copy |
+| `*` | Not Found | Fallback page |
+
+Cleanup is a shared review dialog reachable from Home and the Assistant, not a
+route. It is the only mutating UI path and submits exactly `{ paths }` to
+`POST /api/cleanup/execute`.
+
+### Structure
+
+```text
+frontend/src/
+├── lib/api/          # Axios clients, error mapping, types, query keys
+├── lib/format.ts     # bytes, percent, Unix timestamps, counts
+├── components/       # ui (shadcn), layout, and common states
+├── providers/        # QueryClient, theme, and in-memory settings
+├── features/         # health, disk, assistant, cleanup, settings
+└── pages/            # Home, Assistant, Settings, and NotFound
+```
+
+Feature folders own their API calls, hooks, query keys, and components;
+presentational components do not call Axios directly.
+
+### Configuration and safety
+
+- `VITE_API_BASE_URL` defaults to `http://127.0.0.1:8000`.
+- The backend must allow the Vite origin, normally
+  `http://localhost:5173`, via `STORAGE_BACKEND_CORS_ORIGINS` (or a dev proxy).
+- Provider API keys live in React memory only; they are never written to
+  storage, URLs, logs, or error messages.
+- Model output is rendered as plain text; there is no
+  `dangerouslySetInnerHTML`.
+- Cleanup never runs automatically and requires an explicit acknowledgement
+  before moving exact paths to the system trash.
+
+### Run it
+
+Once the scaffold lands:
+
+```bash
+cd frontend
+npm install
+cp .env.example .env.local   # optional; the default backend URL works
+npm run dev                  # http://localhost:5173
+```
+
+---
+
 ## Getting Started
 
 ```bash
@@ -251,6 +328,9 @@ cd mcp-server && uv sync && uv run storage-intelligence
 
 # Backend (separate shell)
 cd backend && uv sync && cp .env.example .env && uv run storage-intelligence-backend
+
+# Frontend (separate shell; after the initial scaffold lands)
+cd frontend && npm install && npm run dev
 ```
 
 ---
@@ -258,7 +338,9 @@ cd backend && uv sync && cp .env.example .env && uv run storage-intelligence-bac
 ## Quality Checks
 
 Every package carries its own tooling; run the checks **from the package
-directory**:
+directory**.
+
+### Python packages
 
 ```bash
 uv run ruff check --fix
@@ -270,6 +352,19 @@ uv run pytest
 Shared conventions: Ruff (`py313` target, 88 columns), Pyright in `basic` mode
 configured in each package's `pyproject.toml`, and Pytest.
 
+### Frontend
+
+```bash
+npm run lint
+npm run typecheck
+npm run build
+```
+
+The frontend uses ESLint, an effective `tsc` check, and a Vite production
+build. Typecheck must actually cover `src`; if the solution-style `tsconfig`
+makes `tsc --noEmit` a no-op, use `tsc -b`. Component/unit tests are deferred
+in v1.
+
 ---
 
 ## CI
@@ -280,6 +375,9 @@ Pyright, Pytest, `uv build`, and a package-specific import smoke test.
 
 Triggers: pushes and pull requests targeting `master`,
 `refactor/monorepo-structure`, or `refactor/monorepo`.
+
+There is no frontend CI job yet. Run the frontend checks locally until one is
+added.
 
 ---
 
@@ -309,8 +407,9 @@ the frontend.
 
 ## Roadmap
 
-- Frontend dashboard: storage breakdowns, interactive treemap/sunburst, and a
-  cleanup review flow with user-owned selection.
+- Frontend dashboard (up next): storage overview, read-only AI assistant,
+  settings, and a shared cleanup review flow with user-owned selection.
+- Frontend CI job covering lint, typecheck, and build.
 - Background indexing and caching for instant duplicate and large-file queries.
 - Stronger cleanup hardening (protected system paths, backup-before-delete).
 - Containerized deployment for local NAS and home-server setups.
