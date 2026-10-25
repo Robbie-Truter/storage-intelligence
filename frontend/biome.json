@@ -3,7 +3,8 @@
 	"vcs": {
 		"enabled": true,
 		"clientKind": "git",
-		"useIgnoreFile": true
+		"useIgnoreFile": true,
+		"root": ".."
 	},
 	"files": {
 		"ignoreUnknown": false,
@@ -13,7 +14,8 @@
 			"!public",
 			"!package-lock.json",
 			"!components.json",
-			"!src/App.css"
+			"!src/App.css",
+			"!.vscode"
 		]
 	},
 	"css": {
