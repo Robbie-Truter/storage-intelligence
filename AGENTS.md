@@ -68,6 +68,7 @@ the latest integration branch and merged back through a pull request.
 - `/build-frontend-next` runs the read-only `frontend-todo-reader` to brief the next unfinished item, then
   `frontend-builder` to implement that single item, run the frontend checks, and tick only that checkbox.
 - A run never completes a whole phase; invoke the command again for the next item.
+- If an item is already implemented, the builder verifies it and ticks it off instead of redoing the work.
 - Pass a phase explicitly with `/build-frontend-next 2` to start at that phase's next unfinished item.
 - Do not use the backend `todo-reader`/`builder` pair for frontend work.
 - Keep changes inside `frontend/`; do not modify backend, MCP, CI, or Postman files.

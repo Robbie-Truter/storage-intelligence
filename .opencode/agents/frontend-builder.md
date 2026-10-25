@@ -54,13 +54,16 @@ already done.
 
 ## Execute
 
-1. Implement exactly the single `TASKS` item, minimally, matching the handoff
-   and existing conventions. Do not pull in work from sibling items.
-2. Meet every `[auto]` acceptance criterion this item alone proves. Do not claim
+1. If `ALREADY_DONE: yes`, do not re-implement the item. Confirm the cited
+   evidence and the brief's verification still hold, then tick that item. If the
+   claim does not hold, implement only what is missing.
+2. Otherwise, implement exactly the single `TASKS` item, minimally, matching the
+   handoff and existing conventions. Do not pull in work from sibling items.
+3. Meet every `[auto]` acceptance criterion this item alone proves. Do not claim
    manual checks you did not perform.
-3. Run the brief's `VERIFY` commands from `frontend/`. If a command fails, fix
+4. Run the brief's `VERIFY` commands from `frontend/`. If a command fails, fix
    the cause and retry once.
-4. Tick **only that one item's** checkbox in the selected phase of
+5. Tick **only that one item's** checkbox in the selected phase of
    `frontend-todo.md`, plus any acceptance criterion this item alone proves.
    Preserve every other checkbox. Do not tick the phase heading, sibling tasks,
    or unrelated items.
@@ -68,8 +71,9 @@ already done.
 ## Report
 
 - `ITEM` and `MODE`
-- What was implemented (2–3 sentences)
-- Files changed
+- What was implemented, or that the item was already implemented and only
+  verified (2–3 sentences)
+- Files changed (or "none — already implemented")
 - Verification: pass/fail per command
 - The single task ticked in `frontend-todo.md` (and any acceptance ticked)
 - Remaining unchecked items in the phase

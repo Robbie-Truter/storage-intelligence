@@ -41,8 +41,11 @@ Work on exactly **one checklist item per run**. A phase is never one work unit.
 3. If the selected phase has no unchecked implementation tasks but still has
    unchecked acceptance criteria, the work unit is that phase's verification:
    `MODE: verify`, with `TASKS:` empty.
-4. If no phase has any unchecked item, output exactly `ALL_DONE` and stop.
-5. If the only remaining unchecked items are manual checks that a builder
+4. If the selected item's deliverable already exists and works in the repo, set
+   `MODE: verify` and `ALREADY_DONE: yes` with cited evidence. Keep the item in
+   `TASKS:` so the builder can tick it; do not invent replacement work.
+5. If no phase has any unchecked item, output exactly `ALL_DONE` and stop.
+6. If the only remaining unchecked items are manual checks that a builder
    cannot prove (DevTools storage inspection, visual contrast, real
    keyboard-only pass, live cloud/Ollama run, etc.), output `NEEDS_HUMAN` and
    list those items. Do not fabricate a build task for them.
@@ -58,6 +61,9 @@ Work on exactly **one checklist item per run**. A phase is never one work unit.
   item depends on them. Cite exact sections or `file:line` references.
 - Inspect the actual repository state read-only. Confirm which files already
   exist and which must be created. Prefer existing conventions.
+- Check whether the item's deliverable is already implemented. If it is,
+  record `ALREADY_DONE: yes` with `file:line` evidence and scope `STEPS` to
+  verifying it rather than rebuilding it.
 - Check that every API, field, and payload named in the brief exists in the
   handoff and backend source. If something is missing, report it under
   `UNKNOWN:` instead of inventing a workaround.
@@ -76,6 +82,7 @@ MODE: build | verify
 PHASE: Phase <n> — <heading>
 SIZE: small | large
 TEXT: <the single checklist item, verbatim>
+ALREADY_DONE: yes — <file:line evidence> | no
 TASKS:            # exactly one unchecked implementation checkbox, verbatim
   - [ ] ...
 ACCEPTANCE:       # phase acceptance criteria, each tagged [auto] or [manual]
@@ -102,6 +109,9 @@ Rules:
 
 - `TASKS` contains exactly one unchecked item copied verbatim from the
   checklist. Never include more than one; never include a checked item.
+- `ALREADY_DONE: yes` only when read-only inspection proves the deliverable
+  exists and works; the builder then verifies and ticks it instead of redoing
+  the work. Otherwise `no`.
 - `ACCEPTANCE` copies the selected phase's acceptance criteria verbatim with
   `[auto]`/`[manual]` tags. Most will remain unticked until the phase's last
   item — the builder ticks only those this item alone proves.
