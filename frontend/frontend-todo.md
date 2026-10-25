@@ -35,8 +35,6 @@ the deviation in the PR.
 Goal: a running, Biome-clean, strictly typed Vite app with Tailwind, shadcn
 primitives, aliases, env config, and scripts. No product UI yet.
 
-- [ ] Confirm `git branch --show-current` is `feature/frontend` and review
-      `git status` before starting.
 - [ ] Scaffold Vite React TS **in a temporary directory**, then copy the files
       into `frontend/`. Do not scaffold in place or let Vite clear the
       directory: `frontend/FRONTEND_HANDOFF.md` must survive.
