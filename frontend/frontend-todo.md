@@ -35,51 +35,51 @@ the deviation in the PR.
 Goal: a running, Biome-clean, strictly typed Vite app with Tailwind, shadcn
 primitives, aliases, env config, and scripts. No product UI yet.
 
-- [ ] Scaffold Vite React TS **in a temporary directory**, then copy the files
+- [x] Scaffold Vite React TS **in a temporary directory**, then copy the files
       into `frontend/`. Do not scaffold in place or let Vite clear the
       directory: `frontend/FRONTEND_HANDOFF.md` must survive.
 - [ ] Remove Vite demo content: `src/App.css`, `src/assets/react.svg`,
       `public/vite.svg`, and the demo markup in `App.tsx`.
-- [ ] Install runtime dependencies from handoff §3: `react`, `react-dom`,
+- [x] Install runtime dependencies from handoff §3: `react`, `react-dom`,
       `react-router-dom`, `@tanstack/react-query`, `axios`, `framer-motion`,
       `lucide-react`, `class-variance-authority`, `clsx`, `tailwind-merge`.
-- [ ] Install dev dependencies from handoff §3: `@tailwindcss/vite`,
+- [x] Install dev dependencies from handoff §3: `@tailwindcss/vite`,
       `tailwindcss`, `@biomejs/biome`, and `@types/node`.
-- [ ] Remove the Vite template's ESLint packages and `eslint.config.js`; run
+- [x] Remove the Vite template's ESLint packages and `eslint.config.js`; run
       `npx biome init` and commit `biome.json`. Do not install ESLint or
       Prettier.
-- [ ] Configure Tailwind v4: add `@tailwindcss/vite` to `vite.config.ts` and
+- [x] Configure Tailwind v4: add `@tailwindcss/vite` to `vite.config.ts` and
       `@import "tailwindcss";` to `src/index.css`.
-- [ ] Initialize shadcn/ui with New York style and CSS variables, then add only:
+- [x] Initialize shadcn/ui with New York style and CSS variables, then add only:
       `button`, `card`, `input`, `label`, `textarea`, `select`, `checkbox`,
       `dialog`, `accordion`, `badge`, `skeleton`, `alert`, `progress`.
       Add `tooltip` in Phase 6 when the collapsed rail needs it.
-- [ ] Configure the `@/*` alias in `tsconfig.app.json` and
+- [x] Configure the `@/*` alias in `tsconfig.app.json` and
       `vite.config.ts` (`resolve.alias`), plus `src/vite-env.d.ts` typing for
       `VITE_API_BASE_URL`.
-- [ ] Enable strict TypeScript (`strict`, `noUnusedLocals`,
+- [x] Enable strict TypeScript (`strict`, `noUnusedLocals`,
       `noUnusedParameters`, `noFallthroughCasesInSwitch`).
-- [ ] Add `src/lib/utils.ts` with the standard `cn()` helper.
-- [ ] Add scripts: `dev`, `build` (`tsc -b && vite build`), `preview`, `check`
+- [x] Add `src/lib/utils.ts` with the standard `cn()` helper.
+- [x] Add scripts: `dev`, `build` (`tsc -b && vite build`), `preview`, `check`
       (`biome check .`), `check:write` (`biome check --write .`), `format`
       (`biome format --write .`), and `typecheck` (verify it actually checks
       `src`; see the note above).
-- [ ] Add `frontend/.env.example` with
+- [x] Add `frontend/.env.example` with
       `VITE_API_BASE_URL=http://127.0.0.1:8000`; confirm `.env.local` is
       git-ignored and `.env.example` is committed.
-- [ ] Set a placeholder `App.tsx` and `main.tsx` entry point.
+- [x] Set a placeholder `App.tsx` and `main.tsx` entry point.
 
 ### Acceptance criteria
 
-- [ ] `npm install` completes and the lockfile is generated and tracked.
-- [ ] `npm run dev` serves the app on `http://localhost:5173`.
-- [ ] `npm run check`, `npm run typecheck`, and `npm run build` all pass.
-- [ ] An intentional type error makes `npm run typecheck` fail (prove the
+- [x] `npm install` completes and the lockfile is generated and tracked.
+- [x] `npm run dev` serves the app on `http://localhost:5173`.
+- [x] `npm run check`, `npm run typecheck`, and `npm run build` all pass.
+- [x] An intentional type error makes `npm run typecheck` fail (prove the
       script is effective).
-- [ ] `frontend/FRONTEND_HANDOFF.md` is unchanged and present.
+- [x] `frontend/FRONTEND_HANDOFF.md` is unchanged and present.
 - [ ] No demo assets remain and no dependencies beyond handoff §3 plus
       shadcn-managed Radix/animation packages were added.
-- [ ] No ESLint or Prettier packages/config remain; `biome.json` is committed.
+- [x] No ESLint or Prettier packages/config remain; `biome.json` is committed.
 
 ---
 
