@@ -1,15 +1,16 @@
 ---
-description: Sequential frontend handoff — frontend-todo-reader briefs the next unfinished phase in frontend-todo.md, then frontend-builder executes and ticks it. One phase per run.
+description: Sequential frontend handoff — frontend-todo-reader briefs the next unfinished phase in frontend/frontend-todo.md, then frontend-builder executes and ticks it. One phase per run.
 ---
 
 Run exactly one frontend handoff for the next unfinished phase in
-`frontend-todo.md`. If the user supplied a phase, use it: `$ARGUMENTS`.
+`frontend/frontend-todo.md`. If the user supplied a phase, use it: `$ARGUMENTS`.
 
 **Step 1 — scout.** Call the Task tool with `subagent_type:
 frontend-todo-reader` and this task:
 
-> Produce the build brief for the next unfinished phase in `frontend-todo.md`
-> (or for the phase named here: `$ARGUMENTS`), following your instructions.
+> Produce the build brief for the next unfinished phase in
+> `frontend/frontend-todo.md` (or for the phase named here: `$ARGUMENTS`),
+> following your instructions.
 > Return the brief only.
 
 **Step 2 — gate.** Read the scout result before dispatching anyone.
@@ -25,10 +26,10 @@ frontend-todo-reader` and this task:
 **Step 3 — build.** Call the Task tool with `subagent_type:
 frontend-builder`. Pass the scout's **entire brief verbatim**, then append:
 
-> Read `AGENTS.md`. Execute this brief only. Work only in `frontend/` and
-> `frontend-todo.md`. Run VERIFY from `frontend/`. Tick only the completed
-> tasks and provable acceptance criteria. Do not touch backend, MCP, CI, or
-> Postman files. Report exactly as your instructions require.
+> Read `AGENTS.md`. Execute this brief only. Work only in `frontend/`. Run
+> VERIFY from `frontend/`. Tick only the completed tasks and provable
+> acceptance criteria. Do not touch backend, MCP, CI, or Postman files. Report
+> exactly as your instructions require.
 
 **Step 4 — relay.** Summarize the builder's report: files changed, verification
 result, tasks ticked, and any remaining manual acceptance. If manual items

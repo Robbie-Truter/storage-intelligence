@@ -6,8 +6,7 @@ This repository is a monorepo. The root holds:
 
 - `mcp-server/` — the Python FastMCP server (its own `pyproject.toml`, `uv.lock`, `.python-version`, `src/`, and `tests/`).
 - `backend/` — application backend (FastAPI + LangChain; its own `pyproject.toml`, `uv.lock`, `.python-version`, `src/`, and `tests/`).
-- `frontend/` — planned React + Vite frontend (TypeScript strict, Tailwind v4, shadcn/ui, React Router, TanStack Query, Axios, Framer Motion, Biome); not scaffolded yet. The approved build snapshot is `frontend/FRONTEND_HANDOFF.md`.
-- `frontend-todo.md` — ordered frontend implementation checklist.
+- `frontend/` — planned React + Vite frontend (TypeScript strict, Tailwind v4, shadcn/ui, React Router, TanStack Query, Axios, Framer Motion, Biome); not scaffolded yet. The approved build snapshot is `frontend/FRONTEND_HANDOFF.md` and the ordered implementation checklist is `frontend/frontend-todo.md`.
 - `.opencode/` — opencode configuration (backend and frontend subagents, slash commands, skills), and `.github/` — shared CI workflows.
 
 All Python commands below run from the package directory you are working in (`mcp-server/` or `backend/`). Each Python package is a self-contained `uv` project with its own `.venv` and tool config — do not run one package's commands from another's directory. Frontend commands run from `frontend/` and use npm.
@@ -17,7 +16,7 @@ The root `README.md` is the project overview. Each package documents itself in i
 package READMEs are the detailed reference, the root README is the shared context, and the two never duplicate
 the same content. `AGENTS.md` (this file) holds the repo-wide rules; `BACKEND_HANDOFF.md` holds the backend
 design decisions and roadmap. For the frontend, `frontend/FRONTEND_HANDOFF.md` is the approved build snapshot
-and `frontend-todo.md` is the ordered implementation checklist.
+and `frontend/frontend-todo.md` is the ordered implementation checklist.
 
 ## Git branching and merge policy
 
@@ -64,13 +63,13 @@ the latest integration branch and merged back through a pull request.
 
 ## Frontend Workflow
 
-`frontend-todo.md` is the ordered checklist, and frontend work proceeds one phase at a time:
+`frontend/frontend-todo.md` is the ordered checklist, and frontend work proceeds one phase at a time:
 
 - `/build-frontend-next` runs the read-only `frontend-todo-reader` to brief the next unfinished phase, then
   `frontend-builder` to implement it, run the frontend checks, and tick the completed tasks.
 - Pass a phase explicitly with `/build-frontend-next 2` when needed.
 - Do not use the backend `todo-reader`/`builder` pair for frontend work.
-- Keep changes inside `frontend/` plus `frontend-todo.md`; do not modify backend, MCP, CI, or Postman files.
+- Keep changes inside `frontend/`; do not modify backend, MCP, CI, or Postman files.
 
 ## Core Principles
 

@@ -1,5 +1,5 @@
 ---
-description: Reads frontend-todo.md, selects the next unfinished frontend phase, and returns a complete read-only build brief (tasks, files, references, steps, acceptance, verification) for frontend-builder.
+description: Reads frontend/frontend-todo.md, selects the next unfinished frontend phase, and returns a complete read-only build brief (tasks, files, references, steps, acceptance, verification) for frontend-builder.
 mode: subagent
 permission:
   edit: deny

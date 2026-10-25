@@ -12,20 +12,15 @@ scaffolded yet:
 - **`backend/`** — a FastAPI + LangChain service that talks to the MCP server
   over MCP and exposes an HTTP API, including an optional read-only LLM agent.
 - **`frontend/`** — the planned React + Vite dashboard: storage overview,
-  read-only AI assistant, settings, and a shared cleanup review. The build
-  contract is [`frontend/FRONTEND_HANDOFF.md`](frontend/FRONTEND_HANDOFF.md);
-  the work is tracked in [`frontend-todo.md`](frontend-todo.md).
+  read-only AI assistant, settings, and a shared cleanup review.
 
 > **Documentation map.** This README is the **project overview**: architecture,
 > the HTTP API, CI, and the shared workflow. Each package carries its own
 > README with the detailed reference —
 > [`mcp-server/README.md`](mcp-server/README.md) (every tool, prompt, and
 > result shape) and [`backend/README.md`](backend/README.md) (every endpoint,
-> setting, and test suite). The frontend uses
-> [`frontend/FRONTEND_HANDOFF.md`](frontend/FRONTEND_HANDOFF.md) as its approved
-> build snapshot and [`frontend-todo.md`](frontend-todo.md) as its ordered
-> checklist; a durable `frontend/README.md` is added in the final frontend
-> phase. The other tracked documents are
+> setting, and test suite). A durable `frontend/README.md` is added in the final
+> frontend phase. The other tracked documents are
 > [`AGENTS.md`](AGENTS.md) (repo-wide rules for coding agents) and
 > [`BACKEND_HANDOFF.md`](BACKEND_HANDOFF.md) (backend design decisions and
 > roadmap).
@@ -96,9 +91,7 @@ storage-intelligence/
 │   ├── postman/           # Postman collection, environment, and specs
 │   └── tests/
 ├── frontend/              # React + Vite dashboard (planned; not scaffolded yet)
-│   ├── FRONTEND_HANDOFF.md  # approved frontend build snapshot
 │   └── README.md          # durable setup/run docs (added in the final phase)
-├── frontend-todo.md       # ordered frontend implementation checklist
 ├── .opencode/             # opencode agents, commands, and skills
 ├── .github/workflows/     # CI (mcp-server + backend matrix; frontend job pending)
 ├── AGENTS.md              # repo-wide rules for coding agents
@@ -254,9 +247,6 @@ uv run storage-intelligence-backend    # http://127.0.0.1:8000
 ## Frontend (`frontend/`)
 
 The frontend is a planned React dashboard; the app has not been scaffolded yet.
-[`frontend/FRONTEND_HANDOFF.md`](frontend/FRONTEND_HANDOFF.md) is the approved
-build snapshot, and [`frontend-todo.md`](frontend-todo.md) is the ordered
-implementation checklist.
 
 ### Stack
 

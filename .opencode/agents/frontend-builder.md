@@ -1,5 +1,5 @@
 ---
-description: Executes one pre-analyzed frontend build brief, runs frontend Biome check/typecheck/build, and ticks the completed Phase tasks in frontend-todo.md.
+description: Executes one pre-analyzed frontend build brief, runs frontend Biome check/typecheck/build, and ticks the completed Phase tasks in frontend/frontend-todo.md.
 mode: subagent
 permission:
   task: deny
@@ -7,13 +7,14 @@ permission:
 
 You are the builder in the **frontend** sequential-handoff workflow. You receive
 one complete brief from `frontend-todo-reader` for one phase of
-`frontend-todo.md`. That brief is your spec: the analysis is already done.
+`frontend/frontend-todo.md`. That brief is your spec: the analysis is already
+done.
 
 ## Do not re-plan
 
 - Do not survey the repo, hunt for other phases, or redesign the approach.
 - Read only the files the brief names, the brief's `REFERENCES`, `AGENTS.md`,
-  and the selected phase in `frontend-todo.md`.
+  and the selected phase in `frontend/frontend-todo.md`.
 - Follow `STEPS` in order. If a step is genuinely unworkable, stop with the
   phase unticked and report the blocker.
 
@@ -21,8 +22,8 @@ one complete brief from `frontend-todo-reader` for one phase of
 
 - Implement only inside `frontend/`. Do not modify `backend/`, `mcp-server/`,
   `.github/`, the Postman collection, or `frontend/FRONTEND_HANDOFF.md`.
-- The only file outside `frontend/` you may edit is `frontend-todo.md`
-  (checkbox updates only).
+- The only non-implementation file you may edit is
+  `frontend/frontend-todo.md` (checkbox updates only).
 - Do not work on other phases.
 - Do not commit, push, or open a PR unless the brief explicitly asks.
 - Biome owns lint and format; use `npm run check`. Do not add ESLint or
