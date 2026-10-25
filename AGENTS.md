@@ -63,11 +63,12 @@ the latest integration branch and merged back through a pull request.
 
 ## Frontend Workflow
 
-`frontend/frontend-todo.md` is the ordered checklist, and frontend work proceeds one phase at a time:
+`frontend/frontend-todo.md` is the ordered checklist, and frontend work proceeds one checklist item at a time:
 
-- `/build-frontend-next` runs the read-only `frontend-todo-reader` to brief the next unfinished phase, then
-  `frontend-builder` to implement it, run the frontend checks, and tick the completed tasks.
-- Pass a phase explicitly with `/build-frontend-next 2` when needed.
+- `/build-frontend-next` runs the read-only `frontend-todo-reader` to brief the next unfinished item, then
+  `frontend-builder` to implement that single item, run the frontend checks, and tick only that checkbox.
+- A run never completes a whole phase; invoke the command again for the next item.
+- Pass a phase explicitly with `/build-frontend-next 2` to start at that phase's next unfinished item.
 - Do not use the backend `todo-reader`/`builder` pair for frontend work.
 - Keep changes inside `frontend/`; do not modify backend, MCP, CI, or Postman files.
 
