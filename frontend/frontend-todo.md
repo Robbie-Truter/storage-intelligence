@@ -38,7 +38,7 @@ primitives, aliases, env config, and scripts. No product UI yet.
 - [x] Scaffold Vite React TS **in a temporary directory**, then copy the files
       into `frontend/`. Do not scaffold in place or let Vite clear the
       directory: `frontend/FRONTEND_HANDOFF.md` must survive.
-- [ ] Remove Vite demo content: `src/App.css`, `src/assets/react.svg`,
+- [x] Remove Vite demo content: `src/App.css`, `src/assets/react.svg`,
       `public/vite.svg`, and the demo markup in `App.tsx`.
 - [x] Install runtime dependencies from handoff §3: `react`, `react-dom`,
       `react-router-dom`, `@tanstack/react-query`, `axios`, `framer-motion`,
@@ -77,7 +77,7 @@ primitives, aliases, env config, and scripts. No product UI yet.
 - [x] An intentional type error makes `npm run typecheck` fail (prove the
       script is effective).
 - [x] `frontend/FRONTEND_HANDOFF.md` is unchanged and present.
-- [ ] No demo assets remain and no dependencies beyond handoff §3 plus
+- [x] No demo assets remain and no dependencies beyond handoff §3 plus
       shadcn-managed Radix/animation packages were added.
 - [x] No ESLint or Prettier packages/config remain; `biome.json` is committed.
 

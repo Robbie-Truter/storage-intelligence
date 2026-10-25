@@ -14,7 +14,6 @@
 			"!public",
 			"!package-lock.json",
 			"!components.json",
-			"!src/App.css",
 			"!.vscode"
 		]
 	},
