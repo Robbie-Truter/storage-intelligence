@@ -1,5 +1,5 @@
 ---
-description: Executes one pre-analyzed frontend build brief, runs frontend lint/typecheck/build, and ticks the completed Phase tasks in frontend-todo.md.
+description: Executes one pre-analyzed frontend build brief, runs frontend Biome check/typecheck/build, and ticks the completed Phase tasks in frontend-todo.md.
 mode: subagent
 permission:
   task: deny
@@ -25,6 +25,8 @@ one complete brief from `frontend-todo-reader` for one phase of
   (checkbox updates only).
 - Do not work on other phases.
 - Do not commit, push, or open a PR unless the brief explicitly asks.
+- Biome owns lint and format; use `npm run check`. Do not add ESLint or
+  Prettier.
 
 ## Safety invariants (from the handoff)
 

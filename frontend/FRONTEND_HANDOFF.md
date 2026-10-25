@@ -73,6 +73,7 @@ drifted docs.
 - **Axios** for HTTP
 - **Framer Motion** for motion
 - **lucide-react** for icons
+- **Biome** for linting and formatting (replaces ESLint/Prettier)
 - npm as the package manager
 
 Runtime dependencies:
@@ -98,18 +99,19 @@ vite
 typescript
 @tailwindcss/vite
 tailwindcss
-eslint
-@eslint/js
-typescript-eslint
-eslint-plugin-react-hooks
-eslint-plugin-react-refresh
+@biomejs/biome
 @types/react
 @types/react-dom
 @types/node
 ```
 
+Install Biome with `npm i -D -E @biomejs/biome`, then run `npx biome init` and
+commit the generated `biome.json`. Biome replaces ESLint and Prettier; do not
+install either.
+
 Explicitly **do not** add: Zustand/Redux/Jotai, Recharts/Chart.js/D3, MUI/Chakra,
-Vitest/RTL (deferred; see section 13), MSW, or any date library beyond `Intl`.
+Vitest/RTL (deferred; see section 13), MSW, ESLint, Prettier, or any date
+library beyond `Intl`.
 
 Build the volume-usage and "largest children" visuals with CSS/SVG and shadcn
 primitives (progress, cards, bars). No chart dependency in v1.
@@ -121,7 +123,9 @@ primitives (progress, cards, bars). No chart dependency in v1.
   "dev": "vite",
   "build": "tsc -b && vite build",
   "preview": "vite preview",
-  "lint": "eslint .",
+  "check": "biome check .",
+  "check:write": "biome check --write .",
+  "format": "biome format --write .",
   "typecheck": "tsc --noEmit"
 }
 ```
@@ -536,11 +540,11 @@ frontend/
 ├── components.json
 ├── index.html
 ├── package.json
+├── biome.json
 ├── tsconfig.json
 ├── tsconfig.app.json
 ├── tsconfig.node.json
 ├── vite.config.ts
-├── eslint.config.js
 └── src/
     ├── main.tsx
     ├── App.tsx
@@ -833,7 +837,7 @@ This is not a secret and is safe to commit.
 | No OS directory picker                         | Cannot browse natively from the browser                   | Free-text absolute path input with backend error handling                                                 |
 | No protected-path guard                        | Cleanup can target anything the user selects              | Exact-path confirmation; no bulk shortcuts; warn about system paths                                       |
 | No cleanup history, audit, or undo             | Outcomes are ephemeral                                    | Show the immediate response; state that items are in the system trash                                     |
-| No frontend CI job                             | Regressions are not caught automatically                  | Run lint/typecheck/build locally; propose a CI job separately                                             |
+| No frontend CI job                             | Regressions are not caught automatically                  | Run Biome check/typecheck/build locally; propose a CI job separately                                      |
 | CORS defaults to `[]`                          | Browser calls fail until configured                       | Set `STORAGE_BACKEND_CORS_ORIGINS` or use a dev proxy                                                     |
 | Shell command / script endpoints absent        | No terminal integration                                   | Not in scope; do not add                                                                                  |
 
@@ -864,7 +868,7 @@ Fix only if the user explicitly asks; none of these are frontend work.
 ## 12. Phased implementation plan
 
 **Phase 0 — Scaffold**
-Vite + React + TS, Tailwind v4, shadcn init, path alias, ESLint, `.env.example`,
+Vite + React + TS, Tailwind v4, shadcn init, path alias, Biome, `.env.example`,
 providers, router, app shell, theme toggle.
 
 **Phase 1 — API layer and Home**
@@ -884,7 +888,7 @@ Responsive layout, sidebar collapse, reduced-motion support, accessibility pass,
 copy review, empty/error edge cases, long-path handling.
 
 **Phase 5 — Verification and docs**
-Lint/typecheck/build, manual matrix (section 13), update `frontend/README.md` with
+Biome check/typecheck/build, manual matrix (section 13), update `frontend/README.md` with
 durable setup/run instructions once the app exists. Keep this handoff as the
 build snapshot; do not duplicate package docs into it.
 
@@ -895,7 +899,7 @@ build snapshot; do not duplicate package docs into it.
 Commands (from `frontend/`):
 
 ```bash
-npm run lint
+npm run check
 npm run typecheck
 npm run build
 ```
@@ -942,5 +946,5 @@ Resolved here unless the user overrides:
 - Tailwind v4 via `@tailwindcss/vite`; npm; TypeScript strict.
 - Shared cleanup review is in v1 and reachable from Home and Assistant.
 - No charting library; CSS/SVG visuals.
-- Tests deferred: lint, typecheck, build, and the manual matrix above.
+- Tests deferred: Biome check, typecheck, build, and the manual matrix above.
 - Gaps are documented, not designed around with new endpoints.

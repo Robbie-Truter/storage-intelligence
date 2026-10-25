@@ -59,6 +59,8 @@ Do not split a phase into separate runs. The whole phase is one work unit.
   `UNKNOWN:` instead of inventing a workaround.
 - Identify safety-critical work (cleanup, keys, destructive actions) and mark
   it `SIZE: large`.
+- Toolchain: Biome owns lint and format; `npm run check` is the verification
+  gate. Do not propose ESLint, Prettier, or `npm run lint`.
 
 ## Output
 
@@ -84,7 +86,7 @@ STEPS:
   1. <concrete action>
 VERIFY:
   - cd frontend && npm install        # only when dependencies changed
-  - cd frontend && npm run lint
+  - cd frontend && npm run check
   - cd frontend && npm run typecheck
   - cd frontend && npm run build
 RISKS: <real risks, else "none">

@@ -262,7 +262,8 @@ implementation checklist.
 
 React + Vite + TypeScript (strict), Tailwind CSS v4 via `@tailwindcss/vite`,
 shadcn/ui (New York style, CSS variables), React Router, TanStack Query, Axios,
-Framer Motion, and lucide-react. npm is the package manager.
+Framer Motion, and lucide-react. Biome handles linting and formatting; npm is
+the package manager.
 
 ### Routes
 
@@ -288,6 +289,9 @@ frontend/src/
 ├── features/         # health, disk, assistant, cleanup, settings
 └── pages/            # Home, Assistant, Settings, and NotFound
 ```
+
+Frontend tooling is configured in `frontend/biome.json`; `biome check` covers
+linting and formatting.
 
 Feature folders own their API calls, hooks, query keys, and components;
 presentational components do not call Axios directly.
@@ -355,15 +359,15 @@ configured in each package's `pyproject.toml`, and Pytest.
 ### Frontend
 
 ```bash
-npm run lint
+npm run check
 npm run typecheck
 npm run build
 ```
 
-The frontend uses ESLint, an effective `tsc` check, and a Vite production
-build. Typecheck must actually cover `src`; if the solution-style `tsconfig`
-makes `tsc --noEmit` a no-op, use `tsc -b`. Component/unit tests are deferred
-in v1.
+The frontend uses Biome (`biome check`) for linting and formatting, an effective
+`tsc` check, and a Vite production build. Typecheck must actually cover `src`;
+if the solution-style `tsconfig` makes `tsc --noEmit` a no-op, use `tsc -b`.
+Component/unit tests are deferred in v1.
 
 ---
 
@@ -409,7 +413,7 @@ the frontend.
 
 - Frontend dashboard (up next): storage overview, read-only AI assistant,
   settings, and a shared cleanup review flow with user-owned selection.
-- Frontend CI job covering lint, typecheck, and build.
+- Frontend CI job covering Biome check, typecheck, and build.
 - Background indexing and caching for instant duplicate and large-file queries.
 - Stronger cleanup hardening (protected system paths, backup-before-delete).
 - Containerized deployment for local NAS and home-server setups.

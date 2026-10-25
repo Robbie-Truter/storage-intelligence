@@ -6,7 +6,7 @@ This repository is a monorepo. The root holds:
 
 - `mcp-server/` — the Python FastMCP server (its own `pyproject.toml`, `uv.lock`, `.python-version`, `src/`, and `tests/`).
 - `backend/` — application backend (FastAPI + LangChain; its own `pyproject.toml`, `uv.lock`, `.python-version`, `src/`, and `tests/`).
-- `frontend/` — planned React + Vite frontend (TypeScript strict, Tailwind v4, shadcn/ui, React Router, TanStack Query, Axios, Framer Motion); not scaffolded yet. The approved build snapshot is `frontend/FRONTEND_HANDOFF.md`.
+- `frontend/` — planned React + Vite frontend (TypeScript strict, Tailwind v4, shadcn/ui, React Router, TanStack Query, Axios, Framer Motion, Biome); not scaffolded yet. The approved build snapshot is `frontend/FRONTEND_HANDOFF.md`.
 - `frontend-todo.md` — ordered frontend implementation checklist.
 - `.opencode/` — opencode configuration (backend and frontend subagents, slash commands, skills), and `.github/` — shared CI workflows.
 
@@ -58,7 +58,7 @@ the latest integration branch and merged back through a pull request.
 
 - Triggers: push and pull request against `master`, `refactor/monorepo-structure`, and `refactor/monorepo`.
 - Pushes to a feature branch alone do **not** trigger CI — open a PR to the integration branch to get checks.
-- There is no frontend CI job yet. Run `npm run lint`, `npm run typecheck`, and `npm run build` from `frontend/`
+- There is no frontend CI job yet. Run `npm run check`, `npm run typecheck`, and `npm run build` from `frontend/`
   locally; add a frontend job when the app lands.
 - The final integration into `master` must verify the complete project.
 
@@ -85,7 +85,7 @@ the latest integration branch and merged back through a pull request.
 ## Quality Standards & Tooling
 
 These standards apply across the monorepo. The Python packages (`mcp-server/`, `backend/`) share Ruff,
-Pyright, and Pytest; the frontend uses ESLint, TypeScript, and Vite. Each Python package has its own
+Pyright, and Pytest; the frontend uses Biome, TypeScript, and Vite. Each Python package has its own
 `pyproject.toml` with `[tool.ruff]` and `[tool.pyright]` configured to the same standards, and its own
 `.venv`.
 
@@ -109,14 +109,14 @@ Pyright, and Pytest; the frontend uses ESLint, TypeScript, and Vite. Each Python
 The frontend is a Vite + React + TypeScript app managed with npm.
 
 - **Package Manager**: npm; commit the lockfile.
-- **Stack**: React + Vite + TypeScript (strict), Tailwind CSS v4, shadcn/ui, React Router, TanStack Query, Axios, Framer Motion, and lucide-react.
-- **Linting**: `npm run lint` (ESLint).
+- **Stack**: React + Vite + TypeScript (strict), Tailwind CSS v4, shadcn/ui, React Router, TanStack Query, Axios, Framer Motion, lucide-react, and Biome.
+- **Lint & format**: `npm run check` (Biome check, covers lint and format). Use `npm run format` or `npm run check:write` to apply fixes.
 - **Type Checking**: `npm run typecheck`. It must actually check `src`; Vite's solution-style `tsconfig` can make `tsc --noEmit` a no-op, so use `tsc -b` when needed.
 - **Build**: `npm run build`.
-- **Testing**: Vitest/RTL are deferred for v1. Rely on lint, typecheck, build, and the manual verification matrix in `frontend/FRONTEND_HANDOFF.md`.
-- **Scope discipline**: Do not add Zustand/Redux/Jotai, chart libraries, a heavy UI kit, Vitest/RTL, or MSW without approval.
+- **Testing**: Vitest/RTL are deferred for v1. Rely on Biome check, typecheck, build, and the manual verification matrix in `frontend/FRONTEND_HANDOFF.md`.
+- **Scope discipline**: Do not add Zustand/Redux/Jotai, chart libraries, a heavy UI kit, Vitest/RTL, or MSW without approval. Biome owns lint and format; do not add ESLint or Prettier.
 - **Verification Commands** (run from `frontend/` before considering a task complete):
-  - `npm run lint`
+  - `npm run check`
   - `npm run typecheck`
   - `npm run build`
 

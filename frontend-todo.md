@@ -32,7 +32,7 @@ the deviation in the PR.
 
 ## Phase 0 — Scaffold and toolchain
 
-Goal: a running, lint-clean, strictly typed Vite app with Tailwind, shadcn
+Goal: a running, Biome-clean, strictly typed Vite app with Tailwind, shadcn
 primitives, aliases, env config, and scripts. No product UI yet.
 
 - [ ] Confirm `git branch --show-current` is `feature/frontend` and review
@@ -46,7 +46,10 @@ primitives, aliases, env config, and scripts. No product UI yet.
       `react-router-dom`, `@tanstack/react-query`, `axios`, `framer-motion`,
       `lucide-react`, `class-variance-authority`, `clsx`, `tailwind-merge`.
 - [ ] Install dev dependencies from handoff §3: `@tailwindcss/vite`,
-      `tailwindcss`, `@types/node` (the rest ship with the Vite template).
+      `tailwindcss`, `@biomejs/biome`, and `@types/node`.
+- [ ] Remove the Vite template's ESLint packages and `eslint.config.js`; run
+      `npx biome init` and commit `biome.json`. Do not install ESLint or
+      Prettier.
 - [ ] Configure Tailwind v4: add `@tailwindcss/vite` to `vite.config.ts` and
       `@import "tailwindcss";` to `src/index.css`.
 - [ ] Initialize shadcn/ui with New York style and CSS variables, then add only:
@@ -59,8 +62,10 @@ primitives, aliases, env config, and scripts. No product UI yet.
 - [ ] Enable strict TypeScript (`strict`, `noUnusedLocals`,
       `noUnusedParameters`, `noFallthroughCasesInSwitch`).
 - [ ] Add `src/lib/utils.ts` with the standard `cn()` helper.
-- [ ] Add scripts: `dev`, `build` (`tsc -b && vite build`), `preview`, `lint`,
-      and `typecheck` (verify it actually checks `src`; see the note above).
+- [ ] Add scripts: `dev`, `build` (`tsc -b && vite build`), `preview`, `check`
+      (`biome check .`), `check:write` (`biome check --write .`), `format`
+      (`biome format --write .`), and `typecheck` (verify it actually checks
+      `src`; see the note above).
 - [ ] Add `frontend/.env.example` with
       `VITE_API_BASE_URL=http://127.0.0.1:8000`; confirm `.env.local` is
       git-ignored and `.env.example` is committed.
@@ -70,12 +75,13 @@ primitives, aliases, env config, and scripts. No product UI yet.
 
 - [ ] `npm install` completes and the lockfile is generated and tracked.
 - [ ] `npm run dev` serves the app on `http://localhost:5173`.
-- [ ] `npm run lint`, `npm run typecheck`, and `npm run build` all pass.
+- [ ] `npm run check`, `npm run typecheck`, and `npm run build` all pass.
 - [ ] An intentional type error makes `npm run typecheck` fail (prove the
       script is effective).
 - [ ] `frontend/FRONTEND_HANDOFF.md` is unchanged and present.
 - [ ] No demo assets remain and no dependencies beyond handoff §3 plus
       shadcn-managed Radix/animation packages were added.
+- [ ] No ESLint or Prettier packages/config remain; `biome.json` is committed.
 
 ---
 
@@ -125,7 +131,7 @@ and a readiness-aware shell. No Home/Assistant product UI yet.
 - [ ] Theme choice survives a reload; no API key appears in DevTools storage.
 - [ ] Manually verify `getApiErrorMessage` with a string detail, an object
       detail, an array detail, a timeout, and no response.
-- [ ] `npm run lint`, `npm run typecheck`, and `npm run build` pass.
+- [ ] `npm run check`, `npm run typecheck`, and `npm run build` pass.
 
 ---
 
@@ -172,7 +178,7 @@ endpoint usage and per-section states. Reference handoff §8.1.
 - [ ] With the backend down, each section shows its own actionable error/Retry
       while the page remains usable.
 - [ ] Only the documented disk endpoints are called.
-- [ ] `npm run lint`, `npm run typecheck`, and `npm run build` pass.
+- [ ] `npm run check`, `npm run typecheck`, and `npm run build` pass.
 
 ---
 
@@ -203,7 +209,7 @@ Reference handoff §8.3.
 - [ ] Settings shows Local/Cloud, and the Ollama key field is absent.
 - [ ] DevTools Application storage contains theme only; no key material.
 - [ ] A models request failure shows a retryable error.
-- [ ] `npm run lint`, `npm run typecheck`, and `npm run build` pass.
+- [ ] `npm run check`, `npm run typecheck`, and `npm run build` pass.
 
 ---
 
@@ -249,7 +255,7 @@ timeline. Reference handoff §8.2 and §4.5.
 - [ ] Unsupported model and missing key show actionable messages; MCP-down 503
       is distinct; composer contents survive failures.
 - [ ] No cleanup runs automatically from model output.
-- [ ] `npm run lint`, `npm run typecheck`, and `npm run build` pass.
+- [ ] `npm run check`, `npm run typecheck`, and `npm run build` pass.
 
 ---
 
@@ -288,7 +294,7 @@ Reference handoff §8.4 and §10.
 - [ ] Results group deleted, failed, and missing correctly.
 - [ ] Disk queries refetch after success and the UI reflects the change.
 - [ ] No automatic execution and no fabricated paths.
-- [ ] `npm run lint`, `npm run typecheck`, and `npm run build` pass.
+- [ ] `npm run check`, `npm run typecheck`, and `npm run build` pass.
 
 ---
 
@@ -342,7 +348,7 @@ the PR. Reference handoff §13.
 
 ### Automated checks
 
-- [ ] `npm run lint` passes with no warnings/errors.
+- [ ] `npm run check` passes with no diagnostics.
 - [ ] `npm run typecheck` passes and is proven to check `src` sources.
 - [ ] `npm run build` succeeds; run `npm run preview` and smoke-test the
       production bundle.
