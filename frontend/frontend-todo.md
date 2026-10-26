@@ -141,9 +141,9 @@ endpoint usage and per-section states. Reference handoff §8.1.
 - [x] Implement the path context bar: free-text absolute path, Apply on
       Enter/button, Reset, and helper text that blank means the backend's
       default (home).
-- [ ] Add `useDiskUsage(path)` for `GET /api/disk/usage`, omitting `path` when
+- [x] Add `useDiskUsage(path)` for `GET /api/disk/usage`, omitting `path` when
       blank.
-- [ ] Add `useDirectoryUsage(path, 10)` for `GET /api/disk/directory` with
+- [x] Add `useDirectoryUsage(path, 10)` for `GET /api/disk/directory` with
       `top_n=10`.
 - [ ] Add `useFileCounts(path)` for `GET /api/disk/count`.
 - [ ] Add `useFileInfo(selectedPath)` for `GET /api/disk/info`, enabled only

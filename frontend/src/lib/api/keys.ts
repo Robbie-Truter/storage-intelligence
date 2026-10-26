@@ -1,4 +1,7 @@
-export function toOptionalPath(value: string): string | undefined {
+export function toOptionalPath(value?: string | null): string | undefined {
+	if (value === undefined || value === null) {
+		return undefined;
+	}
 	const trimmed = value.trim();
 	return trimmed === "" ? undefined : trimmed;
 }
@@ -15,7 +18,7 @@ export interface ExploreQueryParams {
 export const queryKeys = {
 	readiness: ["health", "ready"] as const,
 	diskUsage: (path?: string) => ["disk", "usage", path ?? null] as const,
-	diskDirectory: (path: string | undefined, topN: number) =>
+	diskDirectory: (path: string | undefined, topN: number = 10) =>
 		["disk", "directory", path ?? null, topN] as const,
 	diskExplore: (params: ExploreQueryParams) =>
 		[
