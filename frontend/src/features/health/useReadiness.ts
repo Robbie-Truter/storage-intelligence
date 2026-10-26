@@ -3,34 +3,30 @@ import { queryKeys } from "@/lib/api/keys";
 import type { ReadinessResponse } from "@/lib/api/types";
 import { getReadiness } from "./api";
 
-export type ReadinessState = "loading" | "healthy" | "degraded" | "offline";
-
 interface UseReadinessResult {
-	state: ReadinessState;
+	isDegraded: boolean;
+	isPending: boolean;
+	isError: boolean;
 	data: ReadinessResponse | undefined;
 }
 
 export function useReadiness(): UseReadinessResult {
-	const query = useQuery({
+	const { isPending, isError, data } = useQuery({
 		queryKey: queryKeys.readiness,
 		queryFn: getReadiness,
 		staleTime: 10_000,
 		gcTime: 60_000,
 		refetchInterval: 30_000,
-		retry: 0,
+		retry: 2,
 	});
 
-	let state: ReadinessState;
-	if (query.isPending) {
-		state = "loading";
-	} else if (query.isError) {
-		state = "offline";
-	} else {
-		state =
-			query.data.status === "ok" && query.data.mcp === "ok"
-				? "healthy"
-				: "degraded";
-	}
+	const isDegraded =
+		data !== undefined && (data.status !== "ok" || data.mcp !== "ok");
 
-	return { state, data: query.data };
+	return {
+		isPending,
+		isError,
+		isDegraded,
+		data,
+	};
 }

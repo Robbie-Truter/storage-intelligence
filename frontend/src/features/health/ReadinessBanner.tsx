@@ -4,13 +4,13 @@ import { Badge } from "@/components/ui/badge";
 import { useReadiness } from "./useReadiness";
 
 export function ReadinessBanner() {
-	const { state, data } = useReadiness();
+	const { isPending, isError, isDegraded, data } = useReadiness();
 
-	if (state === "loading") {
+	if (isPending) {
 		return null;
 	}
 
-	if (state === "healthy") {
+	if (!isError && !isDegraded) {
 		return (
 			<div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
 				<Badge variant="outline" className="gap-1.5">
@@ -22,7 +22,7 @@ export function ReadinessBanner() {
 		);
 	}
 
-	if (state === "degraded") {
+	if (isDegraded) {
 		return (
 			<Alert>
 				<AlertTriangle aria-hidden="true" />
