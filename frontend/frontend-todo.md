@@ -154,13 +154,13 @@ endpoint usage and per-section states. Reference handoff §8.1.
 - [x] Build "Largest immediate children" from `directory.entries`: ranked
       rows/bars, type icon, formatted size, and a note that directory sizes are
       recursive totals. Clicking a row selects it.
-- [ ] Build "Files by extension" from `count.by_extension`: top ~8 groups, an
+- [x] Build "Files by extension" from `count.by_extension`: top ~8 groups, an
       aggregated remainder, `total_files`, and `(no extension)` handling.
-- [ ] Build the selected-entry metadata card from `FileInfoResponse`: name,
+- [x] Build the selected-entry metadata card from `FileInfoResponse`: name,
       type, size, modified, created, extension. Note that a directory's
       `size_bytes` is the directory entry, not its contents. Include a clear
       action.
-- [ ] Add per-section loading skeletons, empty states, and error states with
+- [x] Add per-section loading skeletons, empty states, and error states with
       Retry. A failed card must not blank the page.
 - [ ] Add a CTA linking to `/assistant`.
 - [ ] Do not add large/duplicate/stale/junk/empty panels: there are no REST

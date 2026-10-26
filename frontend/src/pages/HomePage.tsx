@@ -1,7 +1,12 @@
 import { useState } from "react";
 import { PathContextBar } from "@/components/home/PathContextBar";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { LargestChildrenCard, VolumeUsageCard } from "@/features/disk";
+import {
+	FilesByExtensionCard,
+	LargestChildrenCard,
+	SelectedEntryCard,
+	VolumeUsageCard,
+} from "@/features/disk";
 
 export function HomePage() {
 	const [draftPath, setDraftPath] = useState("");
@@ -41,13 +46,22 @@ export function HomePage() {
 			/>
 			<div className="grid gap-6">
 				<VolumeUsageCard path={appliedPath} />
-				<LargestChildrenCard
-					path={appliedPath}
-					selectedPath={selectedPath}
-					onSelectEntry={(path) =>
-						setSelectedPath((prev) => (prev === path ? undefined : path))
-					}
-				/>
+				<div className="grid gap-6 lg:grid-cols-2">
+					<LargestChildrenCard
+						path={appliedPath}
+						selectedPath={selectedPath}
+						onSelectEntry={(path) =>
+							setSelectedPath((prev) => (prev === path ? undefined : path))
+						}
+					/>
+					<div className="space-y-6">
+						<SelectedEntryCard
+							selectedPath={selectedPath}
+							onClearSelection={() => setSelectedPath(undefined)}
+						/>
+						<FilesByExtensionCard path={appliedPath} />
+					</div>
+				</div>
 			</div>
 		</div>
 	);

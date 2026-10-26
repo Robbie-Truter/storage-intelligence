@@ -1,5 +1,7 @@
 export * from "./api";
+export * from "./FilesByExtensionCard";
 export * from "./LargestChildrenCard";
+export * from "./SelectedEntryCard";
 export * from "./useDirectoryUsage";
 export * from "./useDiskUsage";
 export * from "./useFileCounts";
