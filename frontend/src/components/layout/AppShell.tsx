@@ -14,12 +14,23 @@ export function AppShell() {
 		<div className="min-h-svh bg-background text-foreground md:grid md:grid-cols-[16rem_1fr]">
 			<aside className="border-b bg-card/40 md:border-r md:border-b-0">
 				<div className="px-6 py-5">
-					<p className="font-semibold text-lg tracking-tight">
-						Storage Intelligence
-					</p>
-					<p className="text-muted-foreground text-xs">
-						Local-first disk insight
-					</p>
+					<div className="flex gap-1 items-center">
+						<img
+							src="/Storage Intelligence App Favicon.svg"
+							alt="App logo"
+							className="size-7 mr-1 rounded-full shadow border border-black/10"
+						/>
+
+						<div className="-space-y-1.25">
+							<p className="font-semibold text-lg tracking-tight">
+								Storage Intelligence
+							</p>
+
+							<p className="text-muted-foreground text-xs">
+								Local-first disk insight
+							</p>
+						</div>
+					</div>
 				</div>
 				<nav aria-label="Primary" className="flex gap-1 px-3 pb-4 md:flex-col">
 					{NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
