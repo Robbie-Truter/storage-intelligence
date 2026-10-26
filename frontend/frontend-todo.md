@@ -145,8 +145,8 @@ endpoint usage and per-section states. Reference handoff §8.1.
       blank.
 - [x] Add `useDirectoryUsage(path, 10)` for `GET /api/disk/directory` with
       `top_n=10`.
-- [ ] Add `useFileCounts(path)` for `GET /api/disk/count`.
-- [ ] Add `useFileInfo(selectedPath)` for `GET /api/disk/info`, enabled only
+- [x] Add `useFileCounts(path)` for `GET /api/disk/count`.
+- [x] Add `useFileInfo(selectedPath)` for `GET /api/disk/info`, enabled only
       when an entry is selected.
 - [ ] Build the volume usage card from `DiskUsageResponse`: used/free/total,
       percent bar with CSS/shadcn `progress`, and the resolved `path`. Copy must
