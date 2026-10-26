@@ -1,6 +1,9 @@
+import { ArrowRight, Sparkles } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { PathContextBar } from "@/components/home/PathContextBar";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { Button } from "@/components/ui/button";
 import {
 	FilesByExtensionCard,
 	LargestChildrenCard,
@@ -61,6 +64,32 @@ export function HomePage() {
 						/>
 						<FilesByExtensionCard path={appliedPath} />
 					</div>
+				</div>
+			</div>
+
+			<div className="relative overflow-hidden rounded-xl border bg-gradient-to-r from-card via-card to-accent/20 p-6 shadow-sm">
+				<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+					<div className="space-y-1">
+						<div className="flex items-center gap-2">
+							<Sparkles className="size-5 text-indigo-500" aria-hidden="true" />
+							<h3 className="font-semibold text-base tracking-tight">
+								Need deeper analysis?
+							</h3>
+						</div>
+						<p className="text-muted-foreground text-sm max-w-xl">
+							Ask the AI Assistant to scan for large files, duplicates, stale
+							caches, and junk with guided cleanup recommendations.
+						</p>
+					</div>
+					<Button asChild className="shrink-0 group">
+						<Link to="/assistant">
+							<span>Open AI Assistant</span>
+							<ArrowRight
+								className="ml-1.5 size-4 transition-transform group-hover:translate-x-0.5"
+								aria-hidden="true"
+							/>
+						</Link>
+					</Button>
 				</div>
 			</div>
 		</div>

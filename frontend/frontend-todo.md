@@ -162,8 +162,8 @@ endpoint usage and per-section states. Reference handoff §8.1.
       action.
 - [x] Add per-section loading skeletons, empty states, and error states with
       Retry. A failed card must not blank the page.
-- [ ] Add a CTA linking to `/assistant`.
-- [ ] Do not add large/duplicate/stale/junk/empty panels: there are no REST
+- [x] Add a CTA linking to `/assistant`.
+- [x] Do not add large/duplicate/stale/junk/empty panels: there are no REST
       endpoints for them (handoff §10).
 
 ### Acceptance criteria
@@ -176,7 +176,7 @@ endpoint usage and per-section states. Reference handoff §8.1.
 - [ ] With the backend down, each section shows its own actionable error/Retry
       while the page remains usable.
 - [ ] Only the documented disk endpoints are called.
-- [ ] `npm run check`, `npm run typecheck`, and `npm run build` pass.
+- [x] `npm run check`, `npm run typecheck`, and `npm run build` pass.
 
 ---
 
