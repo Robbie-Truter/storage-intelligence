@@ -148,10 +148,10 @@ endpoint usage and per-section states. Reference handoff §8.1.
 - [x] Add `useFileCounts(path)` for `GET /api/disk/count`.
 - [x] Add `useFileInfo(selectedPath)` for `GET /api/disk/info`, enabled only
       when an entry is selected.
-- [ ] Build the volume usage card from `DiskUsageResponse`: used/free/total,
+- [x] Build the volume usage card from `DiskUsageResponse`: used/free/total,
       percent bar with CSS/shadcn `progress`, and the resolved `path`. Copy must
       say this is the whole volume containing the path, not the folder.
-- [ ] Build "Largest immediate children" from `directory.entries`: ranked
+- [x] Build "Largest immediate children" from `directory.entries`: ranked
       rows/bars, type icon, formatted size, and a note that directory sizes are
       recursive totals. Clicking a row selects it.
 - [ ] Build "Files by extension" from `count.by_extension`: top ~8 groups, an

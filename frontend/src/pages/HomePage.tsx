@@ -1,10 +1,14 @@
 import { useState } from "react";
 import { PathContextBar } from "@/components/home/PathContextBar";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { LargestChildrenCard, VolumeUsageCard } from "@/features/disk";
 
 export function HomePage() {
 	const [draftPath, setDraftPath] = useState("");
 	const [appliedPath, setAppliedPath] = useState<string | undefined>(undefined);
+	const [selectedPath, setSelectedPath] = useState<string | undefined>(
+		undefined,
+	);
 
 	const handleApply = () => {
 		const trimmed = draftPath.trim();
@@ -13,11 +17,13 @@ export function HomePage() {
 		} else {
 			setAppliedPath(trimmed);
 		}
+		setSelectedPath(undefined);
 	};
 
 	const handleReset = () => {
 		setDraftPath("");
 		setAppliedPath(undefined);
+		setSelectedPath(undefined);
 	};
 
 	return (
@@ -33,6 +39,16 @@ export function HomePage() {
 				onApply={handleApply}
 				onReset={handleReset}
 			/>
+			<div className="grid gap-6">
+				<VolumeUsageCard path={appliedPath} />
+				<LargestChildrenCard
+					path={appliedPath}
+					selectedPath={selectedPath}
+					onSelectEntry={(path) =>
+						setSelectedPath((prev) => (prev === path ? undefined : path))
+					}
+				/>
+			</div>
 		</div>
 	);
 }
