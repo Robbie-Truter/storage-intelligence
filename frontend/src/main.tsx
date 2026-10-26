@@ -3,6 +3,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import "./index.css";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { queryClient } from "@/providers/query-client";
 import { SettingsProvider } from "@/providers/SettingsProvider";
 import { ThemeProvider } from "@/providers/ThemeProvider";
@@ -21,6 +22,7 @@ createRoot(rootElement).render(
 				<SettingsProvider>
 					<BrowserRouter>
 						<App />
+						<ReactQueryDevtools initialIsOpen={false} />
 					</BrowserRouter>
 				</SettingsProvider>
 			</ThemeProvider>
