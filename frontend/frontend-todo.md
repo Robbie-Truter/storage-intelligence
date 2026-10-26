@@ -88,37 +88,37 @@ primitives, aliases, env config, and scripts. No product UI yet.
 Goal: one HTTP layer, normalized errors, formatting helpers, providers, routing,
 and a readiness-aware shell. No Home/Assistant product UI yet.
 
-- [ ] Create `src/lib/api/types.ts` with the interfaces from handoff §4.6.
-- [ ] Create `src/lib/api/errors.ts` implementing `getApiErrorMessage` per
+- [x] Create `src/lib/api/types.ts` with the interfaces from handoff §4.6.
+- [x] Create `src/lib/api/errors.ts` implementing `getApiErrorMessage` per
       handoff §4.3: string detail, `{ tool, message }` detail, validation-array
       detail, non-JSON response, timeout (`ECONNABORTED`), and no response.
       Never include request bodies, keys, or secret-bearing URLs.
-- [ ] Create `src/lib/api/client.ts` with the `api` and `agentApi` Axios
+- [x] Create `src/lib/api/client.ts` with the `api` and `agentApi` Axios
       instances from handoff §6 (base URL from `VITE_API_BASE_URL` with the
       documented fallback, 30s/180s timeouts, `withCredentials: false`). Export
       the resolved base URL for Settings. No logging interceptors.
-- [ ] Create `src/lib/format.ts` for bytes, percent, Unix-seconds timestamps,
+- [x] Create `src/lib/format.ts` for bytes, percent, Unix-seconds timestamps,
       counts, and empty extensions (`(none)`) per handoff §4.6.
-- [ ] Create `src/lib/api/keys.ts` with query keys from handoff §6 and a
+- [x] Create `src/lib/api/keys.ts` with query keys from handoff §6 and a
       `toOptionalPath(value)` helper that trims and returns `undefined` for
       blank input.
-- [ ] Configure `QueryClient` defaults: `refetchOnWindowFocus: false`, one
+- [x] Configure `QueryClient` defaults: `refetchOnWindowFocus: false`, one
       retry for cheap GETs, no retry for mutations or 4xx.
-- [ ] Implement `ThemeProvider`: `light` / `dark` / `system`, persisted under a
+- [x] Implement `ThemeProvider`: `light` / `dark` / `system`, persisted under a
       single non-secret key, applied via the `dark` class, reacting to system
       changes.
-- [ ] Implement `SettingsProvider`: selected model id and per-provider API keys
+- [x] Implement `SettingsProvider`: selected model id and per-provider API keys
       in React state; `setApiKey` / `clearApiKey` / `setModelId`. Never persist
       keys. Keep the model id in memory for v1 (simplest safe default).
-- [ ] Build `AppShell` with a sidebar and content outlet, plus `PageHeader`
+- [x] Build `AppShell` with a sidebar and content outlet, plus `PageHeader`
       (title, description, actions). Keep the shell simple; collapse and mobile
       overlay are Phase 6.
-- [ ] Add routes `/`, `/assistant`, `/settings`, and `*` with a
+- [x] Add routes `/`, `/assistant`, `/settings`, and `*` with a
       `NotFoundPage`; highlight the active nav item.
-- [ ] Implement `useReadiness` + `ReadinessBanner` per handoff §4.1/§8.1:
+- [x] Implement `useReadiness` + `ReadinessBanner` per handoff §4.1/§8.1:
       healthy, degraded (503), and backend-unreachable states; poll every 30s
       and never block navigation.
-- [ ] Compose `QueryClientProvider`, theme, settings, and `BrowserRouter` in
+- [x] Compose `QueryClientProvider`, theme, settings, and `BrowserRouter` in
       `App.tsx`/`main.tsx`.
 
 ### Acceptance criteria
@@ -129,7 +129,7 @@ and a readiness-aware shell. No Home/Assistant product UI yet.
 - [ ] Theme choice survives a reload; no API key appears in DevTools storage.
 - [ ] Manually verify `getApiErrorMessage` with a string detail, an object
       detail, an array detail, a timeout, and no response.
-- [ ] `npm run check`, `npm run typecheck`, and `npm run build` pass.
+- [x] `npm run check`, `npm run typecheck`, and `npm run build` pass.
 
 ---
 
