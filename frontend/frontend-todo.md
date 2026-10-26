@@ -138,7 +138,7 @@ and a readiness-aware shell. No Home/Assistant product UI yet.
 Goal: the five read-only disk views plus selection metadata, with strict
 endpoint usage and per-section states. Reference handoff §8.1.
 
-- [ ] Implement the path context bar: free-text absolute path, Apply on
+- [x] Implement the path context bar: free-text absolute path, Apply on
       Enter/button, Reset, and helper text that blank means the backend's
       default (home).
 - [ ] Add `useDiskUsage(path)` for `GET /api/disk/usage`, omitting `path` when
