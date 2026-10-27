@@ -21,7 +21,7 @@ const sidebarVariants: Variants = {
 	open: {
 		width: 256,
 		transition: {
-			type: "spring",
+			type: "tween",
 			stiffness: 300,
 			damping: 30,
 		},
@@ -29,7 +29,7 @@ const sidebarVariants: Variants = {
 	closed: {
 		width: 64,
 		transition: {
-			type: "spring",
+			type: "tween",
 			stiffness: 300,
 			damping: 30,
 		},
@@ -87,12 +87,19 @@ export function AppShell() {
 							isCollapsed ? "justify-center" : "justify-start",
 						)}
 					>
-						<img
+						<motion.img
+							animate={{
+								width: isCollapsed ? 28 : 36,
+								height: isCollapsed ? 28 : 36,
+								rotate: isCollapsed ? 0 : 360,
+							}}
+							transition={{
+								duration: 0.4,
+							}}
 							src="/Storage Intelligence App Favicon.svg"
 							alt="App logo"
 							className={cn(
 								"rounded-full shadow border border-black/10 shrink-0 transition-all duration-200",
-								isCollapsed ? "size-7" : "size-9",
 							)}
 						/>
 
@@ -101,8 +108,7 @@ export function AppShell() {
 								<motion.div
 									key="brand-text"
 									variants={fadeVariants}
-									initial="open"
-									animate="open"
+									initial="closed"
 									exit="closed"
 									className="-space-y-1.25 min-w-0"
 								>
