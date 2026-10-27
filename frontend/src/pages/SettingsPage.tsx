@@ -7,6 +7,7 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import { ModelSelector, ProviderKeyFields } from "@/features/settings";
+import { ThemeSwitch } from "@/features/settings/ThemeSwitch";
 
 export function SettingsPage() {
 	return (
@@ -34,7 +35,7 @@ export function SettingsPage() {
 				<Card>
 					<CardHeader>
 						<CardTitle className="text-base font-semibold">
-							Provider API Keys
+							Provider Keys
 						</CardTitle>
 						<CardDescription>
 							Configure API keys for cloud providers. Keys are held in React
@@ -43,6 +44,18 @@ export function SettingsPage() {
 					</CardHeader>
 					<CardContent>
 						<ProviderKeyFields />
+					</CardContent>
+				</Card>
+
+				<Card>
+					<CardHeader>
+						<CardTitle className="text-base font-semibold">Theme</CardTitle>
+						<CardDescription>
+							Toggle between light, dark, and system themes.
+						</CardDescription>
+					</CardHeader>
+					<CardContent>
+						<ThemeSwitch />
 					</CardContent>
 				</Card>
 			</div>
