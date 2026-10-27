@@ -67,7 +67,7 @@ export function HomePage() {
 				</div>
 			</div>
 
-			<div className="relative overflow-hidden rounded-xl border bg-gradient-to-r from-card via-card to-accent/20 p-6 shadow-sm">
+			<div className="relative overflow-hidden rounded-xl border bg-linear-to-r from-card via-card to-accent/20 p-6 shadow-sm">
 				<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 					<div className="space-y-1">
 						<div className="flex items-center gap-2">

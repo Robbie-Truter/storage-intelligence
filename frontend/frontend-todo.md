@@ -185,12 +185,12 @@ endpoint usage and per-section states. Reference handoff §8.1.
 Goal: theme, model selection, and in-memory keys with explicit privacy copy.
 Reference handoff §8.3.
 
-- [ ] Add `useModels` for `GET /api/agent/models` with `staleTime: Infinity`,
+- [x] Add `useModels` for `GET /api/agent/models` with `staleTime: Infinity`,
       `gcTime: 1h`, and no polling.
-- [ ] Build the model selector: label plus provider and `Local`/`Cloud`,
+- [x] Build the model selector: label plus provider and `Local`/`Cloud`,
       defaulting to the first returned entry. Handle an empty/error list
       without hardcoding ids.
-- [ ] Derive the provider list from the fetched models; render a password field
+- [x] Derive the provider list from the fetched models; render a password field
       for every provider except `ollama`, each with reveal and clear controls.
 - [ ] Wire fields to `SettingsProvider`; confirm no key value is written to any
       storage, URL, or log.
