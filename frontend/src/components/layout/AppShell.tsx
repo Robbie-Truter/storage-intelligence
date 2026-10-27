@@ -54,6 +54,13 @@ const fadeVariants = {
 export function AppShell() {
 	const [isCollapsed, setIsCollapsed] = useState(false);
 
+	const toggleSidebar = () => {
+		const nextCollapsed = !isCollapsed;
+		const sidebarWidth = nextCollapsed ? "64px" : "256px";
+		setIsCollapsed(nextCollapsed);
+		document.documentElement.style.setProperty("--sidebar-width", sidebarWidth);
+	};
+
 	return (
 		<div
 			className={cn(
@@ -70,7 +77,7 @@ export function AppShell() {
 				{/* Button perfectly aligned hanging on the outside border edge */}
 				<button
 					type="button"
-					onClick={() => setIsCollapsed(!isCollapsed)}
+					onClick={toggleSidebar}
 					className="absolute top-6 -right-3 z-50 flex size-6 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-sm hover:bg-accent hover:text-foreground active:scale-95 transition-transform"
 				>
 					{isCollapsed ? (
