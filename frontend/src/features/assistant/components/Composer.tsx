@@ -28,8 +28,18 @@ export function Composer({
 	isSending,
 	onSend,
 }: ComposerProps) {
+	const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+		event.preventDefault();
+		if (canSend && !isSending) {
+			onSend();
+		}
+	};
+
 	return (
-		<div className="space-y-4 rounded-lg border bg-card p-4 shadow-sm">
+		<form
+			className="space-y-4 rounded-lg border bg-card p-4 shadow-sm"
+			onSubmit={handleSubmit}
+		>
 			<div className="space-y-2">
 				<Label htmlFor="assistant-path">Path (optional)</Label>
 				<Input
@@ -48,6 +58,12 @@ export function Composer({
 					rows={3}
 					value={question}
 					onChange={(event) => onQuestionChange(event.target.value)}
+					onKeyDown={(event) => {
+						if (event.key === "Enter" && !event.shiftKey) {
+							event.preventDefault();
+							event.currentTarget.form?.requestSubmit();
+						}
+					}}
 				/>
 			</div>
 			<div className="flex flex-wrap items-center justify-between gap-2">
@@ -71,7 +87,7 @@ export function Composer({
 					) : null}
 				</div>
 				<Button
-					onClick={onSend}
+					type="submit"
 					disabled={!canSend || isSending}
 					aria-busy={isSending}
 				>
@@ -83,6 +99,6 @@ export function Composer({
 					Analyzing… this can take up to a minute
 				</p>
 			) : null}
-		</div>
+		</form>
 	);
 }
