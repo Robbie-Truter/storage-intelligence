@@ -61,6 +61,7 @@ export function AssistantPage() {
 			...(trimmedQuestion ? { question: trimmedQuestion } : {}),
 			...(apiKey ? { api_key: apiKey } : {}),
 		};
+
 		analyzeMutation.mutate(request, {
 			onSuccess: (response) => {
 				setHistory((current) => [
@@ -87,22 +88,12 @@ export function AssistantPage() {
 		});
 	};
 
-	const errorMessage = analyzeMutation.isError
-		? getApiErrorMessage(analyzeMutation.error)
-		: null;
-
 	return (
 		<div className="flex flex-col justify-evenly gap-3 h-full">
 			<PageHeader
 				title="AI Assistant"
 				description="Ask questions about your storage using read-only tools."
 			/>
-
-			{errorMessage ? (
-				<Alert variant="destructive">
-					<AlertDescription>{errorMessage}</AlertDescription>
-				</Alert>
-			) : null}
 
 			<div
 				ref={conversationRef}
