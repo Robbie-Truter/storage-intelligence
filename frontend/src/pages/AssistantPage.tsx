@@ -135,6 +135,7 @@ export function AssistantPage() {
 									<AssistantConversation
 										type={item.type}
 										message={item.message}
+										timestamp={new Date()}
 									/>
 								) : null}
 							</motion.div>
