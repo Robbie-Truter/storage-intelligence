@@ -43,12 +43,23 @@ export function AssistantPage() {
 		if (!modelId) {
 			return;
 		}
+
+		let effectiveUserMessage = trimmedQuestion;
+		if (!trimmedQuestion) {
+			if (trimmedPath) {
+				effectiveUserMessage = `Analyze the storage usage under ${trimmedPath} and report what takes the most space.`;
+			} else {
+				effectiveUserMessage =
+					"Analyze the storage usage starting from the default location and report what takes the most space.";
+			}
+		}
+
 		setHistory((current) => [
 			...current,
 			{
 				id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
 				type: "user",
-				message: trimmedQuestion,
+				message: effectiveUserMessage,
 				error: null,
 			},
 		]);

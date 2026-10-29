@@ -6,6 +6,7 @@ tool); the raw ``trash_path`` tool is never among them. The allowlist is the
 manager's business - see ``StorageMCPClient.langchain_tools``.
 """
 
+import os
 from typing import Any
 
 from langchain.agents import create_agent
@@ -81,6 +82,9 @@ async def run_readonly_analysis(
         MCPUnavailable: The connection to the MCP server broke during the run.
         GraphRecursionError: The agent used up its steps without finishing.
     """
+    if path is None or (isinstance(path, str) and not path.strip()):
+        path = os.path.expanduser("~")
+
     prompt = _build_prompt(path, question)
 
     try:
