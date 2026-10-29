@@ -96,6 +96,16 @@ async def explore_directory(
     recursive: bool = False,
     max_results: int = 100,
 ) -> ExploreDirectoryResult:
+    args = {
+        "path": path,
+        "pattern": pattern,
+        "search": search,
+        "kind": kind,
+        "recursive": recursive,
+        "max_results": max_results,
+    }
+    await ctx.info(f"Tool called: explore_directory with arguments {args}")
+
     """List the contents of a directory as one structured record per entry.
 
     Each entry carries its bare `name`, its full `path`, and a `type` label
@@ -181,6 +191,9 @@ async def explore_directory(
 # 2. count_files - how many files of each type are in this folder?
 @mcp.tool(annotations=READ_ONLY)
 async def count_files(ctx: Context, path: str = DEFAULT_PATH) -> CountFilesResult:
+    args = {"path": path}
+    await ctx.info(f"Tool called: count_files with arguments {args}")
+
     """Count files in a directory, grouped by file extension.
 
     Non-recursive: counts only files directly inside `path`. Directories and
@@ -229,6 +242,9 @@ async def count_files(ctx: Context, path: str = DEFAULT_PATH) -> CountFilesResul
 async def directory_disk_usage(
     ctx: Context, path: str = DEFAULT_PATH, top_n: int = 10
 ) -> DirectoryDiskUsageResult:
+    args = {"path": path, "top_n": top_n}
+    await ctx.info(f"Tool called: directory_disk_usage with arguments {args}")
+
     """Find the largest immediate children of a directory, in bytes.
 
     Ranks only the direct children of `path`, though each directory's size is
@@ -305,6 +321,9 @@ async def directory_disk_usage(
 # 4. disk_usage - how much space is left on this volume?
 @mcp.tool(annotations=READ_ONLY)
 async def disk_usage(ctx: Context, path: str = DEFAULT_PATH) -> GetDiskUsageResult:
+    args = {"path": path}
+    await ctx.info(f"Tool called: disk_usage with arguments {args}")
+
     """Get total, used, and free space for the volume containing a path.
 
     Reports the whole filesystem or volume that `path` lives on, not just `path`
@@ -343,6 +362,9 @@ async def disk_usage(ctx: Context, path: str = DEFAULT_PATH) -> GetDiskUsageResu
 # 5. file_info - metadata for a single file or directory
 @mcp.tool(annotations=READ_ONLY)
 async def file_info(ctx: Context, path: str = DEFAULT_PATH) -> FileInfoResult:
+    args = {"path": path}
+    await ctx.info(f"Tool called: file_info with arguments {args}")
+
     """Get metadata about a single file or directory.
 
     Reports name, size, modification and creation times as Unix timestamps, and
@@ -389,6 +411,9 @@ async def find_large_files(
     min_size_mb: float = 100.0,
     max_results: int = 50,
 ) -> list[LargeFileEntry]:
+    args = {"path": path, "min_size_mb": min_size_mb, "max_results": max_results}
+    await ctx.info(f"Tool called: find_large_files with arguments {args}")
+
     """Find large files anywhere under a directory, largest first.
 
     Recursive. Matches on apparent file size, so a sparse file or hard link
@@ -438,6 +463,9 @@ async def find_large_files(
 async def find_duplicate_files(
     ctx: Context, path: str = DEFAULT_PATH, min_size_bytes: int = 1024
 ) -> list[DuplicateFileGroup]:
+    args = {"path": path, "min_size_bytes": min_size_bytes}
+    await ctx.info(f"Tool called: find_duplicate_files with arguments {args}")
+
     """Find groups of files with identical content, grouped by SHA-256 hash.
 
     Recursive. Two-stage for speed: files are bucketed by size first, then only
@@ -510,6 +538,13 @@ async def find_stale_files(
     days_unmodified: int = 90,
     max_results: int = 100,
 ) -> list[StaleFileEntry]:
+    args = {
+        "path": path,
+        "days_unmodified": days_unmodified,
+        "max_results": max_results,
+    }
+    await ctx.info(f"Tool called: find_stale_files with arguments {args}")
+
     """Find files not modified for a while, least recently modified first.
 
     Recursive. Ages come from modification time (`st_mtime`), not access time --
@@ -572,6 +607,9 @@ async def find_stale_files(
 async def find_empty_directories(
     ctx: Context, path: str = DEFAULT_PATH, recursive: bool = True
 ) -> FindEmptyDirectoriesResult:
+    args = {"path": path, "recursive": recursive}
+    await ctx.info(f"Tool called: find_empty_directories with arguments {args}")
+
     """Find empty directories, including parents left empty by their children.
 
     Read-only: nothing is deleted here. The returned paths are what can be
@@ -668,6 +706,9 @@ async def find_empty_directories(
 async def find_junk_files(
     ctx: Context, path: str = DEFAULT_PATH
 ) -> FindJunkFilesResult:
+    args = {"path": path}
+    await ctx.info(f"Tool called: find_junk_files with arguments {args}")
+
     """Find junk files and build-artifact directories in a directory.
 
     Junk files are identified by suffix, comparing each file's lowercased
