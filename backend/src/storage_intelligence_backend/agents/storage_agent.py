@@ -17,6 +17,23 @@ from langgraph.errors import GraphRecursionError
 from storage_intelligence_backend.mcp.errors import MCPError, MCPUnavailable
 from storage_intelligence_backend.mcp.manager import StorageMCPClient
 
+TOOL_USAGE_RULES = (
+    "Tool usage rules:\n"
+    "- Only call filesystem tools when the user's request explicitly requires "
+    "inspecting, analysing, or managing files or directories.\n"
+    "- Do not call filesystem tools for general knowledge questions, "
+    "programming questions, weather, or other unrelated requests.\n"
+    "- The presence of a target path does not automatically mean filesystem "
+    "inspection is required.\n"
+    "- If the request is unrelated to filesystem operations, answer directly "
+    "without calling any tools.\n"
+    "- Do not make tool calls simply to gather context when the request "
+    "can be answered without filesystem access.\n"
+    "- Only answer questions within the scope of storage analysis and file "
+    "management. For unrelated requests, politely explain the agent's scope "
+    "without attempting to answer the question."
+)
+
 
 def build_agent(
     model: str,
@@ -104,27 +121,29 @@ async def run_readonly_analysis(
 
 
 def _build_prompt(path: str | None = None, question: str | None = None) -> str:
-    """The question sent to the agent; the path is part of it when there is one.
+    """Build the complete prompt sent to the storage analysis agent.
 
-    A path and a question are combined - the question first, the target path
-    below it. A question on its own is sent as it is. Without a path the agent
-    is pointed at the default location, which is where the MCP tools start
-    when the model leaves their ``path`` argument out.
+    Combines the tool usage rules with the user's request. If a question is
+    provided, it is used as the main request. Otherwise, a default storage
+    analysis request is generated.
+
+    When a target path is provided, it is appended as additional context
+    for filesystem-related operations. Its presence does not imply that
+    filesystem tools should be used.
+
+    The tool usage rules are included before the user's request to guide
+    the agent's decisions about when filesystem tools are appropriate.
     """
     if question and question.strip():
-        if path:
-            return f"{question.strip()}\n\nTarget path: {path}"
-        return question.strip()
+        prompt = question.strip()
+
+    else:
+        prompt = "Analyze the storage usage and report what takes the most space."
 
     if path:
-        return (
-            f"Analyze the storage usage under {path} and report what takes the most "
-            "space."
-        )
-    return (
-        "Analyze the storage usage starting from the default location and report what "
-        "takes the most space."
-    )
+        prompt = f"{prompt}\n\nTarget path: {path}"
+
+    return f"{TOOL_USAGE_RULES}\n\nUser prompt: {prompt}"
 
 
 def _final_summary(messages: list[Any]) -> str:
