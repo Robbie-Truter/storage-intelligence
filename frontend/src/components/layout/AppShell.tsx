@@ -88,6 +88,7 @@ export function AppShell() {
 						)}
 					>
 						<motion.img
+							initial={false}
 							animate={{
 								width: isCollapsed ? 28 : 36,
 								height: isCollapsed ? 28 : 36,
