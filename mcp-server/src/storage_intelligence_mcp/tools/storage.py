@@ -96,30 +96,31 @@ async def explore_directory(
     recursive: bool = False,
     max_results: int = 100,
 ) -> ExploreDirectoryResult:
-    args = {
-        "path": path,
-        "pattern": pattern,
-        "search": search,
-        "kind": kind,
-        "recursive": recursive,
-        "max_results": max_results,
-    }
-    await ctx.info(f"Tool called: explore_directory with arguments {args}")
+    """List the entries in a directory by name.
 
-    """List the contents of a directory as one structured record per entry.
+    Use when: the user asks what a directory contains, or wants to find
+    entries whose names match a glob (`pattern`) or contain a substring
+    (`search`). When both filters are set, an entry must satisfy both.
 
-    Each entry carries its bare `name`, its full `path`, and a `type` label
-    prefixed with a folder or file emoji. Non-recursive (default): shows only
-    what sits directly inside `path`. Recursive: walks every depth below
-    `path`, so entries report full paths at any depth, e.g.
-    `/home/user/proj/src/storage_intelligence_mcp/core.py`. Empty `entries` with
-    `truncated` False means nothing matched -- an empty directory and filters
-    that exclude everything are indistinguishable.
+    Not for: file counts or disk usage; use `count_files` and
+    `directory_disk_usage`. This tool reports neither sizes nor counts.
 
-    `pattern` and `search` filter on the entry's own name, not on its path,
-    so `*.py` still matches `core.py` at any depth. Scanning stops at
-    `max_results`; `truncated` reports whether more matches existed, so a
-    capped list is always known to be an excerpt.
+    Scope: immediate children by default. `recursive=True` walks every depth
+    below `path`. Filters match the entry's own name, not its path, so `*.py`
+    matches `core.py` at any depth.
+
+    Output: `entries` in scan order (not sorted), each with a bare `name`, a
+    full `path`, and a `type` of "file" or "directory". Scanning stops at
+    `max_results`; `truncated` is true when more matches existed, so a capped
+    list is known to be an excerpt. Empty `entries` with `truncated` false
+    means nothing matched: an empty directory and filters that exclude
+    everything are indistinguishable.
+
+    Limits: does not calculate disk usage, count files, inspect file contents,
+    or recurse unless asked. Do not list a directory again just to total its
+    size or count its files; prior `directory_disk_usage` or `count_files`
+    results already cover that. Once the listing answers the question, answer
+    instead of gathering extra context.
 
     Args:
         path: Absolute directory path to list. Defaults to the home directory.
@@ -133,6 +134,15 @@ async def explore_directory(
             the whole tree below `path` and reports entries at any depth.
         max_results: Stop after this many matching entries. Default 100.
     """
+    args = {
+        "path": path,
+        "pattern": pattern,
+        "search": search,
+        "kind": kind,
+        "recursive": recursive,
+        "max_results": max_results,
+    }
+    await ctx.info(f"Tool called: explore_directory with arguments {args}")
     try:
         p = Path(path)
         if not p.exists():
@@ -191,20 +201,31 @@ async def explore_directory(
 # 2. count_files - how many files of each type are in this folder?
 @mcp.tool(annotations=READ_ONLY)
 async def count_files(ctx: Context, path: str = DEFAULT_PATH) -> CountFilesResult:
-    args = {"path": path}
-    await ctx.info(f"Tool called: count_files with arguments {args}")
+    """Count the files directly inside a directory, grouped by extension.
 
-    """Count files in a directory, grouped by file extension.
+    Use when: the user asks how many files a folder holds, or what file types
+    it contains.
 
-    Non-recursive: counts only files directly inside `path`. Directories and
-    subdirectory contents are ignored, so this answers "what is in this folder"
-    rather than "how much is under it". Extensions are lowercased, so `.PY` and
-    `.py` group together; files without an extension are counted as
-    "(no extension)". Groups are sorted by count, largest first.
+    Not for: a recursive total. This tool returns no names or paths and
+    computes no sizes. Use `explore_directory` to see or filter entries, and
+    `directory_disk_usage` for space. Do not recurse separately to obtain a
+    total that another tool's result already provides.
+
+    Scope: non-recursive. Subdirectories and everything beneath them are
+    ignored.
+
+    Output: `total_files`, and `by_extension` with lowercased extensions (so
+    `.PY` and `.py` merge), files without an extension grouped under
+    "(no extension)", sorted by count (largest first), then name.
+
+    Limits: counts files, not bytes; each file counts once regardless of size.
+    It does not inspect subdirectories or file contents.
 
     Args:
         path: Absolute directory path to inspect. Defaults to the home directory.
     """
+    args = {"path": path}
+    await ctx.info(f"Tool called: count_files with arguments {args}")
     try:
         p = Path(path)
 
@@ -242,27 +263,37 @@ async def count_files(ctx: Context, path: str = DEFAULT_PATH) -> CountFilesResul
 async def directory_disk_usage(
     ctx: Context, path: str = DEFAULT_PATH, top_n: int = 10
 ) -> DirectoryDiskUsageResult:
-    args = {"path": path, "top_n": top_n}
-    await ctx.info(f"Tool called: directory_disk_usage with arguments {args}")
+    """Rank the immediate children of a directory by total size in bytes.
 
-    """Find the largest immediate children of a directory, in bytes.
+    Use when: the user asks which folders or files inside a directory consume
+    the most space. This is the size answer: a directory entry is measured
+    recursively, so its `size_bytes` already includes every nested file and
+    subdirectory.
 
-    Ranks only the direct children of `path`, though each directory's size is
-    measured recursively across everything beneath it. So the entry for a
-    subdirectory reflects its whole subtree, but the set of candidates is just
-    one level deep -- a directory buried three levels down is only reported if
-    its parent is among the top results. Sorted largest first.
+    Not for: recomputing the same totals with `explore_directory`,
+    `count_files`, or another size scan. To drill into a specific child, call
+    this tool again with `path` set to that child and a new, narrower question.
 
-    Unreadable files are skipped silently rather than reported, so a single
-    permissions problem or race cannot abort the ranking. Broken symlinks
-    and other special files (sockets, FIFOs) are skipped too -- they are
-    neither regular files nor directories, and would otherwise be ranked
-    as zero-byte directories.
+    Scope: candidates are direct children only, but directory sizes cover
+    their whole subtrees. A directory several levels down appears only if its
+    parent is among the returned entries. Top-level files report their own
+    size.
+
+    Output: the largest `top_n` entries, largest first, each with a bare
+    `name`, a `type` of "file" or "directory", and `size_bytes`. There is no
+    total and no `truncated` flag, so entries beyond `top_n` are omitted
+    silently.
+
+    Limits: apparent size (`st_size`), not allocated blocks. Unreadable files,
+    broken symlinks, sockets and FIFOs are skipped silently, so a permissions
+    problem can look like missing data.
 
     Args:
         path: Absolute directory path whose children should be ranked.
         top_n: How many of the largest entries to return. Default 10.
     """
+    args = {"path": path, "top_n": top_n}
+    await ctx.info(f"Tool called: directory_disk_usage with arguments {args}")
     try:
         p = Path(path)
 
@@ -321,20 +352,31 @@ async def directory_disk_usage(
 # 4. disk_usage - how much space is left on this volume?
 @mcp.tool(annotations=READ_ONLY)
 async def disk_usage(ctx: Context, path: str = DEFAULT_PATH) -> GetDiskUsageResult:
-    args = {"path": path}
-    await ctx.info(f"Tool called: disk_usage with arguments {args}")
+    """Report total, used, and free space for the volume containing `path`.
 
-    """Get total, used, and free space for the volume containing a path.
+    Use when: the user asks how full a volume is or how much free space
+    remains.
 
-    Reports the whole filesystem or volume that `path` lives on, not just `path`
-    itself. Used bytes count everything on that volume including unrelated
-    system and application data, so a free-space reading here is not
-    attributable to any one directory.
+    Not for: measuring a directory's size; use `directory_disk_usage` for
+    immediate children or `file_info` for a single entry. This describes the
+    whole volume, not `path` itself.
+
+    Scope: the filesystem or volume containing any existing path, file or
+    directory. `used_bytes` includes unrelated system and application data,
+    so it cannot be attributed to one directory.
+
+    Output: `total_bytes`, `used_bytes`, `free_bytes`, and `usage_percent`
+    (used divided by total, one decimal, or 0.0 for a zero-size volume).
+
+    Limits: no breakdown by folder and no per-directory totals. A free-space
+    reading here does not answer "what is taking space inside this folder".
 
     Args:
         path: Any existing path on the volume to measure. Defaults to the home
             directory.
     """
+    args = {"path": path}
+    await ctx.info(f"Tool called: disk_usage with arguments {args}")
     try:
         p = Path(path)
 
@@ -362,23 +404,34 @@ async def disk_usage(ctx: Context, path: str = DEFAULT_PATH) -> GetDiskUsageResu
 # 5. file_info - metadata for a single file or directory
 @mcp.tool(annotations=READ_ONLY)
 async def file_info(ctx: Context, path: str = DEFAULT_PATH) -> FileInfoResult:
-    args = {"path": path}
-    await ctx.info(f"Tool called: file_info with arguments {args}")
+    """Return metadata for one file or directory.
 
-    """Get metadata about a single file or directory.
+    Use when: the user asks about a specific path's size, type, extension, or
+    modified or created time.
 
-    Reports name, size, modification and creation times as Unix timestamps, and
-    whether the path is a file or a directory. Directories have a small
-    platform-dependent `size_bytes` that reflects the entry itself, not the
-    space its contents occupy.
+    Not for: comparing multiple entries or measuring a directory's contents;
+    use `directory_disk_usage` for that, or `explore_directory` to list a
+    directory.
 
-    `created` prefers the platform's birth time (macOS `st_birthtime`); where
-    none exists it falls back to `st_ctime`, which is creation time on
-    Windows but last-metadata-change time on Linux.
+    Scope: exactly one path, file or directory. It does not list a directory's
+    children or recurse.
+
+    Output: `name`, `path`, `type` ("file" or "directory"), `size_bytes`,
+    `modified` and `created` as Unix timestamps, and `extension` (including
+    the dot, or "" when there is none).
+
+    Limits: a directory's `size_bytes` is the small platform-dependent inode
+    entry size, not the total of its contents. `created` prefers the
+    platform's birth time (macOS `st_birthtime`); where none exists it falls
+    back to `st_ctime`, which is creation time on Windows but last
+    metadata-change time on Linux. Does not report permissions, ownership, or
+    contents.
 
     Args:
         path: Absolute path to the file or directory to inspect.
     """
+    args = {"path": path}
+    await ctx.info(f"Tool called: file_info with arguments {args}")
     try:
         p = Path(path)
         if not p.exists():
@@ -411,21 +464,35 @@ async def find_large_files(
     min_size_mb: float = 100.0,
     max_results: int = 50,
 ) -> list[LargeFileEntry]:
-    args = {"path": path, "min_size_mb": min_size_mb, "max_results": max_results}
-    await ctx.info(f"Tool called: find_large_files with arguments {args}")
+    """Find individual files at or above a size threshold under a directory.
 
-    """Find large files anywhere under a directory, largest first.
+    Use when: the user asks for the largest files, files over N MB, or which
+    single files are consuming space. This tool reports individual files, not
+    just the largest folders.
 
-    Recursive. Matches on apparent file size, so a sparse file or hard link
-    reports the size its contents imply rather than the blocks it occupies.
-    Unreadable entries are skipped silently rather than reported, so a
-    permissions problem looks the same as "nothing matched" here.
+    Not for: ranking directories; use `directory_disk_usage`, whose entries
+    already include all nested content, instead of repeating this scan to
+    reconstruct a directory total.
+
+    Scope: recursive. Every file below `path` is tested. Matches are returned
+    largest first and capped at `max_results`.
+
+    Output: entries with `path`, `size_bytes`, and `size_mb`.
+
+    Limits: compares apparent size (`st_size`), so sparse files and hard links
+    report the size their contents imply rather than the blocks they occupy.
+    Unreadable entries are skipped silently, so a permissions problem looks
+    like "nothing matched". There is no total-match count or `truncated` flag,
+    so a result that fills `max_results` may omit smaller matches. A large
+    file is not necessarily unused or safe to delete.
 
     Args:
         path: Absolute directory path to search under.
         min_size_mb: Minimum size in megabytes; 100.0 (default) means 100 MB.
         max_results: Maximum number of files to return. Default 50.
     """
+    args = {"path": path, "min_size_mb": min_size_mb, "max_results": max_results}
+    await ctx.info(f"Tool called: find_large_files with arguments {args}")
     try:
         p = Path(path)
         if not p.exists():
@@ -463,26 +530,37 @@ async def find_large_files(
 async def find_duplicate_files(
     ctx: Context, path: str = DEFAULT_PATH, min_size_bytes: int = 1024
 ) -> list[DuplicateFileGroup]:
-    args = {"path": path, "min_size_bytes": min_size_bytes}
-    await ctx.info(f"Tool called: find_duplicate_files with arguments {args}")
+    """Find groups of files with identical content using SHA-256.
 
-    """Find groups of files with identical content, grouped by SHA-256 hash.
+    Use when: the user asks for duplicate files or space wasted on copies.
+    Equal size alone is not evidence of duplication.
 
-    Recursive. Two-stage for speed: files are bucketed by size first, then only
-    buckets with more than one member are hashed. That means small files are
-    silently excluded by the default `min_size_bytes` -- two identical 500-byte
-    config files are not reported, and the result gives no hint that the floor
-    applied. Lower the threshold to search small files, at the cost of hashing
-    far more of them.
+    Not for: inferring duplicates from size alone; equal size is not evidence
+    of equal content, and this tool may read file contents to hash them.
 
-    Every path in a group is byte-identical, but which copy to keep is a
-    judgement call this tool cannot make: the oldest, the newest, or the one
-    outside a synced folder are all reasonable choices.
+    Scope: recursive. Files are bucketed by size first, then only same-size
+    buckets with at least two members are hashed. Returns groups of two or
+    more byte-identical files, sorted by shared file size, largest first.
+    Unique files produce no group.
+
+    Output: each group has the shared `size_bytes` and the `files` paths of
+    its identical copies.
+
+    Limits: `min_size_bytes` (default 1024) silently excludes smaller files,
+    and the result does not indicate that the floor applied -- identical
+    500-byte configs are not reported. Lower it to include small files, at the
+    cost of hashing far more of them. Hashing large trees can be slow.
+    Unreadable files are skipped silently. Byte-identical does not mean
+    disposable: keeping the oldest, the newest, or the copy outside a synced
+    folder are all reasonable choices, but none is automatically safe to
+    delete.
 
     Args:
         path: Absolute directory path to search under.
         min_size_bytes: Skip files smaller than this. Default 1024 (1 KB).
     """
+    args = {"path": path, "min_size_bytes": min_size_bytes}
+    await ctx.info(f"Tool called: find_duplicate_files with arguments {args}")
     try:
         p = Path(path)
         if not p.exists():
@@ -538,32 +616,40 @@ async def find_stale_files(
     days_unmodified: int = 90,
     max_results: int = 100,
 ) -> list[StaleFileEntry]:
-    args = {
-        "path": path,
-        "days_unmodified": days_unmodified,
-        "max_results": max_results,
-    }
-    await ctx.info(f"Tool called: find_stale_files with arguments {args}")
+    """Find files not modified within a number of days, oldest first.
 
-    """Find files not modified for a while, least recently modified first.
+    Use when: the user asks which files have not been touched recently, or for
+    old files in a directory.
 
-    Recursive. Ages come from modification time (`st_mtime`), not access time --
-    reading a file does not make it look fresher here. That is deliberate: most
-    filesystems mount `noatime`, so access times are unreliable and would report
-    nearly every file as stale. `days_unmodified` is age of the content, so a
-    file edited recently but unchanged for years still qualifies as stale.
+    Not for: junk, duplicates, empty directories, or size. Use
+    `find_junk_files`, `find_duplicate_files`, `find_empty_directories`, or
+    `find_large_files` for those questions. This tool answers age only.
 
-    Unreadable entries are skipped silently, so a permissions problem is
-    indistinguishable from "nothing matched". The scan itself is uncapped --
-    every file under `path` is examined -- but the returned list is cut at
-    `max_results`; the oldest files come first, which is usually the useful
-    end.
+    Scope: recursive. Age comes from modification time (`st_mtime`), not
+    access time, so reading a file does not make it look fresher. That is
+    deliberate: many filesystems mount `noatime`, making access times
+    unreliable and liable to mark nearly every file as stale.
+
+    Output: `path`, `size_bytes`, and `days_unmodified`, oldest first, capped
+    at `max_results`.
+
+    Limits: the scan is uncapped but the returned list is cut at `max_results`
+    with no `truncated` flag or total count. Unreadable entries are skipped
+    silently, so a permissions problem is indistinguishable from "nothing
+    matched". Old is not the same as unnecessary or safe to delete; confirm
+    with the user and inspect the file before proposing removal.
 
     Args:
         path: Absolute directory path to search under.
         days_unmodified: Age threshold in days. Default 90.
         max_results: Maximum number of files to return. Default 100.
     """
+    args = {
+        "path": path,
+        "days_unmodified": days_unmodified,
+        "max_results": max_results,
+    }
+    await ctx.info(f"Tool called: find_stale_files with arguments {args}")
     try:
         p = Path(path)
         if not p.exists():
@@ -607,28 +693,35 @@ async def find_stale_files(
 async def find_empty_directories(
     ctx: Context, path: str = DEFAULT_PATH, recursive: bool = True
 ) -> FindEmptyDirectoriesResult:
-    args = {"path": path, "recursive": recursive}
-    await ctx.info(f"Tool called: find_empty_directories with arguments {args}")
+    """Find empty directories, including parents that empty out in a cascade.
 
-    """Find empty directories, including parents left empty by their children.
+    Use when: the user asks which folders are empty, or what cleanup would
+    remove.
 
-    Read-only: nothing is deleted here. The returned paths are what can be
-    passed to `trash_path` to remove them.
+    Not for: file age, junk, duplicates, or size; use `find_stale_files`,
+    `find_junk_files`, `find_duplicate_files`, or `directory_disk_usage`.
+    This tool is read-only; returned paths are potential cleanup candidates,
+    not deletion instructions.
 
-    The cascade is simulated, not read off the filesystem. In a chain like
-    `a/b/c`, only `c` is empty right now; `a/b` and `a` become empty once `c` is
-    gone. A plain scan would report just `c`, so directories are walked deepest
-    first and each candidate's already-matched children are filtered out of its
-    listing. Paths come back deepest first, which is the order they must be
-    deleted in.
+    Scope: `recursive=True` (default) walks every depth and simulates the
+    cascade. In `a/b/c`, only `c` is empty now, but `a/b` and `a` become empty
+    once `c` is gone, so all are reported. It walks deepest first and filters
+    already-matched children out of each parent's listing. Results are deepest
+    first -- the order they must be removed in. `recursive=False` checks
+    immediate children only and reports no cascade.
 
-    Directories that cannot be read (usually permissions) are counted in
-    `skipped_directories` rather than treated as empty, so an unreadable folder
-    is never proposed for deletion. Symlinks are followed when deciding whether
-    a directory is empty, so a link to an empty folder is reported and trashing
-    the link leaves the target alone.
+    Output: `path`, `recursive`, the exact `total_empty_directories`, a
+    `sample` of at most 25 paths (deepest first) with `truncated` when the
+    sample is shorter than the total, and `skipped_directories` /
+    `skipped_directories_count` for directories that could not be read. `path`
+    itself is never reported.
 
-    `path` itself is never reported, only what is below it.
+    Limits: unreadable directories (usually permissions) are counted as
+    skipped, never proposed as empty, so an unreadable folder is never a
+    deletion candidate. Symlinks are followed when judging emptiness, so a
+    link to an empty folder can be reported; trashing the link leaves its
+    target alone. Empty does not mean safe to remove -- confirm with the user.
+    Do not rescan to count them; the result already has the count.
 
     Args:
         path: Absolute directory path to search under. Must be a directory.
@@ -636,6 +729,8 @@ async def find_empty_directories(
             the immediate children, and so reports no cascade: a subdirectory
             still containing its own child is not empty at that point.
     """
+    args = {"path": path, "recursive": recursive}
+    await ctx.info(f"Tool called: find_empty_directories with arguments {args}")
     try:
         p = Path(path)
         if not p.exists():
@@ -706,31 +801,41 @@ async def find_empty_directories(
 async def find_junk_files(
     ctx: Context, path: str = DEFAULT_PATH
 ) -> FindJunkFilesResult:
-    args = {"path": path}
-    await ctx.info(f"Tool called: find_junk_files with arguments {args}")
+    """Find junk files and build-artifact directories inside a directory.
 
-    """Find junk files and build-artifact directories in a directory.
+    Use when: the user asks about temporary files, logs, caches, or build
+    output in one folder, or how many such items it contains.
 
-    Junk files are identified by suffix, comparing each file's lowercased
-    suffix against a fixed list (see JUNK_EXTENSIONS): .log, .tmp, .temp,
-    .cache, .backup, .bak, .old, .swp, .swo, .swn, .o, .obj, .exe, .dll, .lib,
-    .a, .so, .out. The filename `.DS_Store` is also matched by name, since it
-    has no suffix.
+    Not for: age, duplicates, large files, or general cleanup. Use
+    `find_stale_files`, `find_duplicate_files`, `find_large_files`, or
+    `directory_disk_usage` for those questions. This tool matches fixed names
+    and extensions only.
 
-    Directories are matched by name instead: top-level entries called
-    `node_modules`, `__pycache__`, `dist`, `build` or `target` (see
-    JUNK_DIRECTORIES) are reported in `directories` as full paths. Names are
-    unique within one directory, so that list is never capped and is not
-    reflected in `total_files` or `by_extension`, which count files only.
+    Scope: non-recursive. Only immediate children of `path` are inspected; a
+    nested `node_modules` under a child folder is not found unless this tool
+    is called on that folder.
 
-    Non-recursive: only direct children of `path` are inspected. Returns
-    counts plus a `sample` of matching paths capped at `SAMPLE_LIMIT`, so
-    `sample` and `directories` can both be passed straight to `trash_path`.
-    `truncated` reports whether `sample` is shorter than `total_files`.
+    Files match by lowercased suffix from a fixed list (`.log`, `.tmp`,
+    `.temp`, `.cache`, `.backup`, `.bak`, `.old`, `.swp`, `.swo`, `.swn`,
+    `.o`, `.obj`, `.exe`, `.dll`, `.lib`, `.a`, `.so`, `.out`); `.DS_Store`
+    matches by name. Directories match by exact name: `node_modules`,
+    `__pycache__`, `dist`, `build`, `target`.
+
+    Output: `total_files`, `by_extension` (with `.ds_store` for `.DS_Store`),
+    the uncapped `directories` list, and a `sample` of file paths capped at 25,
+    with `truncated` when the sample is shorter than `total_files`.
+    `directories` is not included in the counts. Both `sample` and
+    `directories` are potential cleanup candidates, not deletion instructions.
+
+    Limits: a name or extension match does not mean the file is unnecessary or
+    safe to delete -- confirm with the user and inspect before removing. It
+    does not measure sizes, ages, or contents, and it does not recurse.
 
     Args:
         path: Absolute directory path to inspect. Defaults to the home directory.
     """
+    args = {"path": path}
+    await ctx.info(f"Tool called: find_junk_files with arguments {args}")
     try:
         p = Path(path)
 

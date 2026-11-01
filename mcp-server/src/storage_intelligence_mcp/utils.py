@@ -36,9 +36,7 @@ class ExploreDirectoryEntry(TypedDict):
         to the entry at any depth, so the agent can act on it directly
         (e.g. pass it to `file_info` or `trash_path`) without having to
         reconstruct the relative path itself.
-    type - a prefixed label: "📁 Directory " or "📄 File ". Not a bare
-        type enum -- the prefix is what gets rendered, so the leading
-        emoji and trailing space are part of the value.
+    type - a plain label, either "file" or "directory".
     """
 
     name: str
@@ -68,9 +66,9 @@ class ExploreDirectoryResult(TypedDict):
 class FindEmptyDirectoriesResult(TypedDict):
     """Successful `find_empty_directories` result.
 
-    Read-only counterpart to `delete_empty_directories`: it reports what *would*
-    be deleted, including the parent directories that only become empty once
-    their children are removed, without touching the filesystem.
+    Read-only: it reports what *would* be deleted, including the parent
+    directories that only become empty once their children are removed,
+    without touching the filesystem.
 
         path - the root that was searched.
         recursive - whether subdirectories were searched at all depth.
