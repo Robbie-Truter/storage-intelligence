@@ -3,7 +3,7 @@
 A local-first [FastMCP](https://gofastmcp.com) server for storage analysis,
 disk usage profiling, duplicate and junk detection, and **recoverable** cleanup.
 
-It exposes structured tools, one resource, and nine prompts over the Model
+It exposes structured tools, five resources, and nine prompts over the Model
 Context Protocol. Everything runs on the local machine: file paths and metadata
 never leave it.
 
@@ -46,7 +46,7 @@ built on top of this server lives in [`backend/`](../backend/README.md).
 │  server.py    entry point; imports register every primitive      │
 │                                                                  │
 │  tools/       storage.py (10 analysis) · cleanup.py (2 trash)   │
-│  resources/   info://server                                      │
+│  resources/   info://server · storage://*                        │
 │  prompts/     storage.py (6 analysis) · cleanup.py (3 cleanup)   │
 └───────────────────────────────┬──────────────────────────────────┘
                                 │  local file I/O
@@ -74,7 +74,11 @@ src/storage_intelligence_mcp/
 │   ├── storage.py      # 10 read-only analysis tools
 │   └── cleanup.py      # preview_trash + trash_path (send2trash)
 ├── resources/
-│   └── example.py      # info://server
+│   ├── example.py      # info://server
+│   ├── docker.py       # storage://docker
+│   ├── macos.py        # storage://macos
+│   ├── nodejs.py       # storage://nodejs
+│   └── python.py       # storage://python
 └── prompts/
     ├── storage.py      # 6 analysis prompts
     └── cleanup.py      # 3 cleanup prompts
@@ -194,6 +198,13 @@ sends each target to the system trash through `send2trash` and returns an
 | URI | Payload |
 | --- | ------- |
 | `info://server` | `{"name": "storage-intelligence", "version": "0.1.0"}` |
+| `storage://docker` | Markdown guide to Docker images, containers, volumes, and build cache |
+| `storage://macos` | Markdown guide to macOS storage consumers and safe cleanup |
+| `storage://nodejs` | Markdown guide to npm, pnpm, Yarn, `node_modules`, and build output |
+| `storage://python` | Markdown guide to pip, uv, conda, virtual environments, and bytecode |
+
+The storage guides are read-only reference material based on the linked
+official documentation. They do not inspect or modify the local filesystem.
 
 ---
 

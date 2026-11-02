@@ -7,8 +7,8 @@ It is made of two Python packages and a planned React frontend that has not been
 scaffolded yet:
 
 - **`mcp-server/`** — a [FastMCP](https://gofastmcp.com) server exposing
-  structured tools, a resource, and prompts for local storage analysis and
-  safe cleanup.
+  structured tools, resources, and prompts for local storage analysis and safe
+  cleanup.
 - **`backend/`** — a FastAPI + LangChain service that talks to the MCP server
   over MCP and exposes an HTTP API, including an optional read-only LLM agent.
 - **`frontend/`** — the planned React + Vite dashboard: storage overview,
@@ -48,7 +48,7 @@ scaffolded yet:
 ┌──────────────────────────────────────────────────────────────────┐
 │      MCP Server — FastMCP  (mcp-server/)                         │
 │                                                                  │
-│   12 tools · 1 resource · 9 prompts                             │
+│   12 tools · 5 resources · 9 prompts                             │
 └───────────────────────────────┬──────────────────────────────────┘
                                 │ local file I/O
                                 ▼
@@ -74,7 +74,7 @@ storage-intelligence/
 │   │   ├── server.py      # entry point; registers tools/resources/prompts
 │   │   ├── utils.py       # formatting, hashing, OS traversal helpers
 │   │   ├── tools/         # storage.py (analysis) · cleanup.py (trash)
-│   │   ├── resources/     # info://server
+│   │   ├── resources/     # info://server · storage://*
 │   │   └── prompts/       # ready-made analysis / cleanup workflows
 │   └── tests/
 ├── backend/               # FastAPI + LangChain service (own pyproject, uv.lock, .venv)
@@ -135,7 +135,8 @@ path first so nested reporting stays accurate.
 
 ### Resource and prompts
 
-- Resource `info://server` — server metadata.
+- Five resources: `info://server` for metadata, plus read-only storage guides
+  for `docker`, `macos`, `nodejs`, and `python`.
 - Nine prompts: `analyze_storage`, `analyze_home_storage`, `find_old_files`,
   `find_duplicates`, `clean_junk`, `free_up_space`, `prepare_cleanup`,
   `remove_junk`, `remove_empty_dirs`.
