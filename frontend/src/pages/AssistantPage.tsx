@@ -126,7 +126,7 @@ export function AssistantPage() {
 								initial={{ opacity: 0, y: 12 }}
 								animate={{ opacity: 1, y: 0 }}
 								exit={{ opacity: 0, y: -12 }}
-								transition={{ duration: 0.2 }}
+								transition={{ duration: 0.2, delay: 0.1 }}
 								className="space-y-2"
 							>
 								{item.error ? (
@@ -145,44 +145,65 @@ export function AssistantPage() {
 					)}
 				</AnimatePresence>
 
-				{analyzeMutation.isPending ? (
-					<div className="flex items-center justify-start pl-4">
-						<div className="flex items-center gap-1.5 rounded-lg bg-muted px-2 py-2">
-							<motion.span
-								initial={{ opacity: 0.2, scale: 0.8 }}
-								animate={{ opacity: [0.2, 1, 0.2], scale: [0.8, 1, 0.8] }}
-								transition={{ duration: 1.2, repeat: Number.POSITIVE_INFINITY }}
-								className="text-lg leading-none text-muted-foreground"
-							>
-								•
-							</motion.span>
-							<motion.span
-								initial={{ opacity: 0.2, scale: 0.8 }}
-								animate={{ opacity: [0.2, 1, 0.2], scale: [0.8, 1, 0.8] }}
-								transition={{
-									duration: 1.2,
-									repeat: Number.POSITIVE_INFINITY,
-									delay: 0.2,
-								}}
-								className="text-lg leading-none text-muted-foreground"
-							>
-								•
-							</motion.span>
-							<motion.span
-								initial={{ opacity: 0.2, scale: 0.8 }}
-								animate={{ opacity: [0.2, 1, 0.2], scale: [0.8, 1, 0.8] }}
-								transition={{
-									duration: 1.2,
-									repeat: Number.POSITIVE_INFINITY,
-									delay: 0.4,
-								}}
-								className="text-lg leading-none text-muted-foreground"
-							>
-								•
-							</motion.span>
-						</div>
-					</div>
-				) : null}
+				<AnimatePresence mode="popLayout">
+					{analyzeMutation.isPending ? (
+						<motion.div
+							initial={{ opacity: 0, x: -8 }}
+							animate={{ opacity: 1, x: 0 }}
+							exit={{ opacity: 0, x: -8 }}
+							transition={{ duration: 0.4, delay: 0.1 }}
+							className="flex items-center justify-start pl-1"
+						>
+							<div className="flex items-center gap-1.5 rounded-lg bg-muted px-2 py-2">
+								<motion.span
+									animate={{ opacity: [0.4, 1, 0.4] }}
+									transition={{
+										duration: 1.6,
+										repeat: Number.POSITIVE_INFINITY,
+									}}
+									className="pr-1 text-sm text-muted-foreground"
+								>
+									Thinking
+								</motion.span>
+								<motion.span
+									initial={{ opacity: 0.2, scale: 0.8 }}
+									animate={{ opacity: [0.2, 1, 0.2], scale: [0.8, 1, 0.8] }}
+									transition={{
+										duration: 1.2,
+										repeat: Number.POSITIVE_INFINITY,
+									}}
+									className="text-lg leading-none text-muted-foreground"
+								>
+									•
+								</motion.span>
+								<motion.span
+									initial={{ opacity: 0.2, scale: 0.8 }}
+									animate={{ opacity: [0.2, 1, 0.2], scale: [0.8, 1, 0.8] }}
+									transition={{
+										duration: 1.2,
+										repeat: Number.POSITIVE_INFINITY,
+										delay: 0.2,
+									}}
+									className="text-lg leading-none text-muted-foreground"
+								>
+									•
+								</motion.span>
+								<motion.span
+									initial={{ opacity: 0.2, scale: 0.8 }}
+									animate={{ opacity: [0.2, 1, 0.2], scale: [0.8, 1, 0.8] }}
+									transition={{
+										duration: 1.2,
+										repeat: Number.POSITIVE_INFINITY,
+										delay: 0.4,
+									}}
+									className="text-lg leading-none text-muted-foreground"
+								>
+									•
+								</motion.span>
+							</div>
+						</motion.div>
+					) : null}
+				</AnimatePresence>
 			</div>
 
 			<div>
