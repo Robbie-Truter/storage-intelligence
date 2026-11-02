@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     # Agent / LLM. The model itself is chosen per request from the catalogue
     # in ``agents/models.py``, so it is not an environment setting.
     agent_temperature: float = 0.0
-    agent_max_iterations: int = 10
+    agent_max_iterations: int = 15
 
     # HTTP / CORS.
     cors_origins: list[str] = Field(default_factory=list)

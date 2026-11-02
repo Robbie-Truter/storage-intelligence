@@ -229,7 +229,9 @@ async def test_unexpected_error_when_iterdir_raises(
 async def test_ctx_info_awaited_on_happy_path(ctx: AsyncMock, tree: Path) -> None:
     await find_junk_files(ctx, path=str(tree))
 
-    ctx.info.assert_awaited_once()
-    message = ctx.info.await_args.args[0]
-    assert "Counting junk files" in message
-    assert str(tree) in message
+    messages = [call.args[0] for call in ctx.info.await_args_list]
+    assert any("Counting junk files" in message for message in messages)
+    assert any(
+        "find_junk_files completed successfully" in message for message in messages
+    )
+    assert all(str(tree) in message for message in messages)

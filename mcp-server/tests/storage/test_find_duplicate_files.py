@@ -236,8 +236,10 @@ async def test_all_hash_reads_failing_returns_empty(
 async def test_ctx_info_includes_min_size_bytes(ctx: AsyncMock, tree: Path) -> None:
     await find_duplicate_files(ctx, path=str(tree), min_size_bytes=2048)
 
-    ctx.info.assert_awaited_once()
-    message = ctx.info.await_args.args[0]
-    assert "Scanning for duplicates" in message
-    assert str(tree) in message
-    assert "min_size_bytes=2048" in message
+    messages = [call.args[0] for call in ctx.info.await_args_list]
+    assert any("Scanning for duplicates" in message for message in messages)
+    assert any("min_size_bytes=2048" in message for message in messages)
+    assert any(
+        "find_duplicate_files completed successfully" in message for message in messages
+    )
+    assert all(str(tree) in message for message in messages)

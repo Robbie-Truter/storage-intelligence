@@ -190,7 +190,7 @@ async def test_ctx_info_awaited_with_path(ctx: AsyncMock, tree: Path) -> None:
 
     await file_info(ctx, path=str(note))
 
-    ctx.info.assert_awaited_once()
-    message = ctx.info.await_args.args[0]
-    assert "Getting metadata for" in message
-    assert str(note) in message
+    messages = [call.args[0] for call in ctx.info.await_args_list]
+    assert any("Getting metadata for" in message for message in messages)
+    assert any("file_info completed successfully" in message for message in messages)
+    assert all(str(note) in message for message in messages)

@@ -223,11 +223,14 @@ async def test_unexpected_error_when_rglob_raises(
 async def test_ctx_info_includes_recursive_flag(ctx: AsyncMock, tree: Path) -> None:
     await find_empty_directories(ctx, path=str(tree), recursive=False)
 
-    ctx.info.assert_awaited_once()
-    message = ctx.info.await_args.args[0]
-    assert "Scanning for empty directories" in message
-    assert str(tree) in message
-    assert "recursive=False" in message
+    messages = [call.args[0] for call in ctx.info.await_args_list]
+    assert any("Scanning for empty directories" in message for message in messages)
+    assert any("recursive=False" in message for message in messages)
+    assert any(
+        "find_empty_directories completed successfully" in message
+        for message in messages
+    )
+    assert all(str(tree) in message for message in messages)
 
 
 @pytest.mark.anyio

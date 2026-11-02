@@ -185,7 +185,7 @@ async def test_unexpected_error_when_iterdir_raises(
 async def test_ctx_info_awaited_with_counting_files(ctx: AsyncMock, tree: Path) -> None:
     await count_files(ctx, path=str(tree))
 
-    ctx.info.assert_awaited_once()
-    message = ctx.info.await_args.args[0]
-    assert "Counting files in" in message
-    assert str(tree) in message
+    messages = [call.args[0] for call in ctx.info.await_args_list]
+    assert any("Counting files in" in message for message in messages)
+    assert any("count_files completed successfully" in message for message in messages)
+    assert all(str(tree) in message for message in messages)

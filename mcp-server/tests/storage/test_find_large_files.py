@@ -211,8 +211,10 @@ async def test_ctx_info_includes_threshold_and_max_results(
 ) -> None:
     await find_large_files(ctx, path=str(tree), min_size_mb=2.5, max_results=7)
 
-    ctx.info.assert_awaited_once()
-    message = ctx.info.await_args.args[0]
-    assert "Searching for files > 2.5 MB" in message
-    assert str(tree) in message
-    assert "max_results=7" in message
+    messages = [call.args[0] for call in ctx.info.await_args_list]
+    assert any("Searching for files > 2.5 MB" in message for message in messages)
+    assert any("max_results=7" in message for message in messages)
+    assert any(
+        "find_large_files completed successfully" in message for message in messages
+    )
+    assert all(str(tree) in message for message in messages)

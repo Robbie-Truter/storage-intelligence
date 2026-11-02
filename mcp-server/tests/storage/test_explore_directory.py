@@ -244,7 +244,9 @@ async def test_ctx_info_awaited_with_listing_directory(
 ) -> None:
     await explore_directory(ctx, path=str(tree))
 
-    ctx.info.assert_awaited_once()
-    message = ctx.info.await_args.args[0]
-    assert "Listing directory" in message
-    assert str(tree) in message
+    messages = [call.args[0] for call in ctx.info.await_args_list]
+    assert any("Listing directory" in message for message in messages)
+    assert any(
+        "explore_directory completed successfully" in message for message in messages
+    )
+    assert all(str(tree) in message for message in messages)

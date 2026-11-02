@@ -264,11 +264,10 @@ async def test_missing_path_raises_tool_error(ctx: AsyncMock, tmp_path: Path) ->
 async def test_ctx_info_includes_parameters(ctx: AsyncMock, tree: Path) -> None:
     await find_stale_files(ctx, path=str(tree), days_unmodified=90, max_results=50)
 
-    ctx.info.assert_awaited_once()
-    msg = ctx.info.await_args.args[0]
-    assert "Scanning for stale files in" in msg
-    assert "days_unmodified=90" in msg
-    # Note: the source ctx.info does not include max_results; we assert it contains
-    # days_unmodified as per plan intent; the string may not include max_results.
-    # Source format: "Scanning for stale files in: {path} (days_unmodified=...)"
-    assert str(tree) in msg
+    messages = [call.args[0] for call in ctx.info.await_args_list]
+    assert any("Scanning for stale files in" in message for message in messages)
+    assert any("days_unmodified=90" in message for message in messages)
+    assert any(
+        "find_stale_files completed successfully" in message for message in messages
+    )
+    assert all(str(tree) in message for message in messages)

@@ -171,7 +171,7 @@ async def test_ctx_info_awaited_with_path(
 
     await disk_usage(ctx, path=str(tmp_path))
 
-    ctx.info.assert_awaited_once()
-    message = ctx.info.await_args.args[0]
-    assert "Getting disk usage" in message
-    assert str(tmp_path) in message
+    messages = [call.args[0] for call in ctx.info.await_args_list]
+    assert any("Getting disk usage" in message for message in messages)
+    assert any("disk_usage completed successfully" in message for message in messages)
+    assert all(str(tmp_path) in message for message in messages)

@@ -192,6 +192,10 @@ async def explore_directory(
                 }
             )
 
+        await ctx.info(
+            f"explore_directory completed successfully: {len(entries)} entries "
+            f"(truncated={truncated}) in {p}"
+        )
         return {"path": str(p), "entries": entries, "truncated": truncated}
     except Exception as exc:
         await ctx.error(f"explore_directory failed: {type(exc).__name__}: {exc}")
@@ -246,6 +250,7 @@ async def count_files(ctx: Context, path: str = DEFAULT_PATH) -> CountFilesResul
                 ext = child.suffix.lower() or "(no extension)"
                 by_extension[ext] = by_extension.get(ext, 0) + 1
 
+        await ctx.info(f"count_files completed successfully: {total} files in {p}")
         return {
             "path": str(p),
             "total_files": total,
@@ -341,8 +346,13 @@ async def directory_disk_usage(
             else:
                 continue
         results.sort(key=lambda x: x["size_bytes"], reverse=True)
+        entries = results[:top_n]
 
-        return {"path": str(p), "entries": results[:top_n]}
+        await ctx.info(
+            f"directory_disk_usage completed successfully: ranked {len(results)} "
+            f"entries, returning {len(entries)} in {p}"
+        )
+        return {"path": str(p), "entries": entries}
 
     except Exception as exc:
         await ctx.error(f"directory_disk_usage failed: {type(exc).__name__}: {exc}")
@@ -388,6 +398,10 @@ async def disk_usage(ctx: Context, path: str = DEFAULT_PATH) -> GetDiskUsageResu
         total, used, free = shutil.disk_usage(p)
         usage_percent = round(used / total * 100, 1) if total else 0.0
 
+        await ctx.info(
+            f"disk_usage completed successfully: {usage_percent}% used, "
+            f"{free} bytes free on volume for {p}"
+        )
         return {
             "path": str(p),
             "total_bytes": total,
@@ -440,8 +454,7 @@ async def file_info(ctx: Context, path: str = DEFAULT_PATH) -> FileInfoResult:
         await ctx.info(f"Getting metadata for: {path}")
 
         stat = p.stat()
-
-        return {
+        result: FileInfoResult = {
             "name": p.name,
             "path": str(p),
             "type": "directory" if p.is_dir() else "file",
@@ -450,6 +463,12 @@ async def file_info(ctx: Context, path: str = DEFAULT_PATH) -> FileInfoResult:
             "created": getattr(stat, "st_birthtime", stat.st_ctime),
             "extension": p.suffix,
         }
+
+        await ctx.info(
+            f"file_info completed successfully: {result['type']} {p} "
+            f"({result['size_bytes']} bytes)"
+        )
+        return result
 
     except Exception as exc:
         await ctx.error(f"file_info failed: {type(exc).__name__}: {exc}")
@@ -519,7 +538,13 @@ async def find_large_files(
                     }
                 )
         results.sort(key=lambda x: x["size_bytes"], reverse=True)
-        return results[:max_results]
+        matches = results[:max_results]
+
+        await ctx.info(
+            f"find_large_files completed successfully: found {len(results)} "
+            f"matches, returning {len(matches)} in {p}"
+        )
+        return matches
     except Exception as exc:
         await ctx.error(f"find_large_files failed: {type(exc).__name__}: {exc}")
         raise
@@ -598,11 +623,18 @@ async def find_duplicate_files(
                     continue
                 groups.setdefault((size, digest), []).append(str(fp))
 
-        return [
+        duplicate_groups: list[DuplicateFileGroup] = [
             {"size_bytes": size, "files": paths}
             for (size, _digest), paths in sorted(groups.items(), key=lambda x: -x[0][0])
             if len(paths) > 1
         ]
+        duplicate_files = sum(len(group["files"]) for group in duplicate_groups)
+
+        await ctx.info(
+            f"find_duplicate_files completed successfully: {len(duplicate_groups)} "
+            f"groups ({duplicate_files} files) in {p}"
+        )
+        return duplicate_groups
     except Exception as exc:
         await ctx.error(f"find_duplicate_files failed: {type(exc).__name__}: {exc}")
         raise
@@ -682,7 +714,13 @@ async def find_stale_files(
                 continue
 
         stale_files.sort(key=lambda x: x["days_unmodified"], reverse=True)
-        return stale_files[:max_results]
+        matches = stale_files[:max_results]
+
+        await ctx.info(
+            f"find_stale_files completed successfully: found {len(stale_files)} "
+            f"stale files, returning {len(matches)} in {p}"
+        )
+        return matches
     except Exception as exc:
         await ctx.error(f"find_stale_files failed: {type(exc).__name__}: {exc}")
         raise
@@ -782,6 +820,10 @@ async def find_empty_directories(
         candidates = sorted(virtual_deleted, key=lambda d: (-len(d.parts), str(d)))
         total = len(candidates)
 
+        await ctx.info(
+            f"find_empty_directories completed successfully: {total} empty "
+            f"directories, {len(skipped_dirs)} skipped in {p}"
+        )
         return {
             "path": str(p),
             "recursive": recursive,
@@ -876,6 +918,10 @@ async def find_junk_files(
             if len(sample) < SAMPLE_LIMIT:
                 sample.append(str(child))
 
+        await ctx.info(
+            f"find_junk_files completed successfully: {total} junk files and "
+            f"{len(directories)} build directories in {p}"
+        )
         return {
             "path": str(p),
             "total_files": total,

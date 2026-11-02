@@ -21,6 +21,8 @@ TOOL_USAGE_RULES = (
     "Tool usage rules:\n"
     "- Only call filesystem tools when the user's request explicitly requires "
     "inspecting, analysing, or managing files or directories.\n"
+    "- Do not call filesystem tool if user says 'Hi' or 'hello' or 'hey', only call "
+    "tools if their question is related to storage analysis \n"
     "- Do not call filesystem tools for general knowledge questions, "
     "programming questions, weather, or other unrelated requests.\n"
     "- The presence of a target path does not automatically mean filesystem "
@@ -31,7 +33,17 @@ TOOL_USAGE_RULES = (
     "can be answered without filesystem access.\n"
     "- Only answer questions within the scope of storage analysis and file "
     "management. For unrelated requests, politely explain the agent's scope "
-    "without attempting to answer the question."
+    "without attempting to answer the question.\n"
+    "- When using directory_disk_usage, remember that it recursively calculates "
+    "the total size of each immediate child directory.\n"
+    "- Use its results to answer questions about the largest immediate files "
+    "and directories. Do not automatically drill down into the largest "
+    "directories or repeat the scan on nested paths.\n"
+    "- Only scan a subdirectory when the user explicitly requests a deeper "
+    "breakdown or the initial results are insufficient to answer a specific "
+    "part of the request.\n"
+    "- If the available results answer the user's request, stop calling tools "
+    "and provide the answer."
 )
 
 
@@ -68,6 +80,7 @@ def build_agent(
     agent = create_agent(
         model=llm,
         tools=tools,
+        system_prompt=TOOL_USAGE_RULES,
     )
 
     return agent.with_config({"recursion_limit": max_iterations})
@@ -143,7 +156,7 @@ def _build_prompt(path: str | None = None, question: str | None = None) -> str:
     if path:
         prompt = f"{prompt}\n\nTarget path: {path}"
 
-    return f"{TOOL_USAGE_RULES}\n\nUser prompt: {prompt}"
+    return prompt
 
 
 def _final_summary(messages: list[Any]) -> str:

@@ -224,8 +224,10 @@ async def test_unexpected_error_when_iterdir_raises(
 async def test_ctx_info_includes_top_n(ctx: AsyncMock, tree: Path) -> None:
     await directory_disk_usage(ctx, path=str(tree), top_n=3)
 
-    ctx.info.assert_awaited_once()
-    message = ctx.info.await_args.args[0]
-    assert "Computing recursive disk usage" in message
-    assert str(tree) in message
-    assert "top_n=3" in message
+    messages = [call.args[0] for call in ctx.info.await_args_list]
+    assert any("Computing recursive disk usage" in message for message in messages)
+    assert any("top_n=3" in message for message in messages)
+    assert any(
+        "directory_disk_usage completed successfully" in message for message in messages
+    )
+    assert all(str(tree) in message for message in messages)
