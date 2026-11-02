@@ -19,31 +19,22 @@ from storage_intelligence_backend.mcp.manager import StorageMCPClient
 
 TOOL_USAGE_RULES = (
     "Tool usage rules:\n"
-    "- Only call filesystem tools when the user's request explicitly requires "
-    "inspecting, analysing, or managing files or directories.\n"
-    "- Do not call filesystem tool if user says 'Hi' or 'hello' or 'hey', only call "
-    "tools if their question is related to storage analysis \n"
-    "- Do not call filesystem tools for general knowledge questions, "
-    "programming questions, weather, or other unrelated requests.\n"
-    "- The presence of a target path does not automatically mean filesystem "
-    "inspection is required.\n"
-    "- If the request is unrelated to filesystem operations, answer directly "
-    "without calling any tools.\n"
-    "- Do not make tool calls simply to gather context when the request "
-    "can be answered without filesystem access.\n"
-    "- Only answer questions within the scope of storage analysis and file "
-    "management. For unrelated requests, politely explain the agent's scope "
-    "without attempting to answer the question.\n"
-    "- When using directory_disk_usage, remember that it recursively calculates "
-    "the total size of each immediate child directory.\n"
-    "- Use its results to answer questions about the largest immediate files "
-    "and directories. Do not automatically drill down into the largest "
-    "directories or repeat the scan on nested paths.\n"
-    "- Only scan a subdirectory when the user explicitly requests a deeper "
-    "breakdown or the initial results are insufficient to answer a specific "
-    "part of the request.\n"
-    "- If the available results answer the user's request, stop calling tools "
-    "and provide the answer."
+    "- Only use filesystem tools for requests involving storage analysis or file management. "
+    "For greetings, general knowledge, programming, weather or unrelated requests, "
+    "respond without calling tools and briefly explain the agent's scope when appropriate.\n"
+    "- A supplied target path does not automatically require filesystem inspection.\n"
+    "- Do not make tool calls merely to gather context when the request can be answered "
+    "without filesystem access.\n"
+    "- directory_disk_usage recursively calculates the size of each immediate child "
+    "directory. Use its results for largest-item rankings; do not automatically drill "
+    "down or repeat scans on nested paths. Investigate further only when explicitly "
+    "requested or necessary to answer a specific question.\n"
+    "- Stop calling tools once the available results answer the request.\n"
+    "- Never recommend deleting something solely because it is large, old, unused "
+    "or classified as junk. Establish its purpose and potential impact first. "
+    "If uncertain, explain the risk and advise against deletion until verified.\n"
+    "- Explain the consequences of destructive cleanup commands. Treat databases, "
+    "backups, virtual disks and persistent volumes as potentially important data.\n"
 )
 
 
@@ -118,9 +109,7 @@ async def run_readonly_analysis(
     prompt = _build_prompt(path, question)
 
     try:
-        result = await agent.ainvoke(
-            {"messages": [{"role": "user", "content": prompt}]}
-        )
+        result = await agent.ainvoke({"messages": [{"role": "user", "content": prompt}]})
     except (MCPError, GraphRecursionError):
         raise
     except Exception as exc:
