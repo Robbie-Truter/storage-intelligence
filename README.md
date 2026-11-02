@@ -48,7 +48,7 @@ scaffolded yet:
 ┌──────────────────────────────────────────────────────────────────┐
 │      MCP Server — FastMCP  (mcp-server/)                         │
 │                                                                  │
-│   12 tools · 5 resources · 9 prompts                             │
+│   13 tools · 5 resources · 9 prompts                             │
 └───────────────────────────────┬──────────────────────────────────┘
                                 │ local file I/O
                                 ▼
@@ -73,7 +73,7 @@ storage-intelligence/
 │   │   ├── core.py        # FastMCP instance
 │   │   ├── server.py      # entry point; registers tools/resources/prompts
 │   │   ├── utils.py       # formatting, hashing, OS traversal helpers
-│   │   ├── tools/         # storage.py (analysis) · cleanup.py (trash)
+│   │   ├── tools/         # storage.py (analysis) · resources.py (guide) · cleanup.py (trash)
 │   │   ├── resources/     # info://server · storage://*
 │   │   └── prompts/       # ready-made analysis / cleanup workflows
 │   └── tests/

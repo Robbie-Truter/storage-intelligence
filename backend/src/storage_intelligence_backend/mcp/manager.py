@@ -52,6 +52,7 @@ READONLY_TOOL_ALLOWLIST: frozenset[str] = frozenset(
         "find_empty_directories",
         "find_junk_files",
         "preview_trash",
+        "read_storage_guide",
     }
 )
 

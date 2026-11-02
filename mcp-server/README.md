@@ -45,7 +45,8 @@ built on top of this server lives in [`backend/`](../backend/README.md).
 │  core.py      FastMCP instance + server instructions            │
 │  server.py    entry point; imports register every primitive      │
 │                                                                  │
-│  tools/       storage.py (10 analysis) · cleanup.py (2 trash)   │
+│  tools/       storage.py (analysis) · resources.py (guide)       │
+│               cleanup.py (trash)                                 │
 │  resources/   info://server · storage://*                        │
 │  prompts/     storage.py (6 analysis) · cleanup.py (3 cleanup)   │
 └───────────────────────────────┬──────────────────────────────────┘
@@ -72,6 +73,7 @@ src/storage_intelligence_mcp/
 ├── utils.py            # response TypedDicts + path error helpers
 ├── tools/
 │   ├── storage.py      # 10 read-only analysis tools
+│   ├── resources.py    # read_storage_guide
 │   └── cleanup.py      # preview_trash + trash_path (send2trash)
 ├── resources/
 │   ├── example.py      # info://server
@@ -88,16 +90,18 @@ src/storage_intelligence_mcp/
 
 ## Tools
 
-Twelve tools in total: ten read-only analysis tools, one read-only preview
-tool, and one mutating tool.
+Thirteen tools in total: ten read-only analysis tools, one read-only guide
+tool, one read-only preview tool, and one mutating tool.
 
-Every tool takes an optional `path` and falls back to the **home directory**
-when it is omitted. Analysis tools are annotated `read_only_hint=True`;
-`trash_path` is annotated `read_only_hint=False, destructive_hint=True`.
+Analysis and cleanup tools take an optional `path` and fall back to the **home
+directory** when it is omitted. Read-only tools are annotated
+`read_only_hint=True`; `trash_path` is annotated `read_only_hint=False,
+destructive_hint=True`.
 
 ### Analysis tools
 
-All ten live in `tools/storage.py` and never modify the filesystem.
+The ten analysis tools live in `tools/storage.py`; `read_storage_guide` lives
+in `tools/resources.py`. None of them modify the filesystem.
 
 | Tool | Parameters (defaults) | Returns |
 | ---- | --------------------- | ------- |
@@ -149,6 +153,16 @@ Behaviour worth knowing:
   `.exe`, `.dll`, `.lib`, `.a`, `.so`, `.out` — plus `.DS_Store` by name, and
   top-level directories named `node_modules`, `__pycache__`, `dist`, `build`,
   or `target` (reported in `directories`).
+
+### Guide tool
+
+`read_storage_guide` in `tools/resources.py` returns the Markdown body of one
+registered storage resource without inspecting the filesystem. The `node` topic
+maps to `storage://nodejs`.
+
+| Tool | Parameters | Returns |
+| ---- | ---------- | ------- |
+| `read_storage_guide` | `topic`: `docker`, `macos`, `node`, or `python` | `topic`, `uri`, `mime_type`, `content` |
 
 ### Cleanup tools
 
@@ -205,6 +219,7 @@ sends each target to the system trash through `send2trash` and returns an
 
 The storage guides are read-only reference material based on the linked
 official documentation. They do not inspect or modify the local filesystem.
+The `read_storage_guide` tool returns the same content by topic.
 
 ---
 

@@ -286,6 +286,23 @@ class FindJunkFilesResult(TypedDict):
     truncated: bool
 
 
+class ReadStorageGuideResult(TypedDict):
+    """Successful `read_storage_guide` result.
+
+    Read-only reference content for one supported storage topic.
+
+        topic - the requested topic.
+        uri - the registered MCP resource URI that supplied the content.
+        mime_type - the resource's MIME type, normally "text/markdown".
+        content - the full guide text.
+    """
+
+    topic: str
+    uri: str
+    mime_type: str
+    content: str
+
+
 def path_error(path: str) -> ToolError:
     """Build a `ToolError` for a missing path."""
     return ToolError(f"Path not found: {path}")
