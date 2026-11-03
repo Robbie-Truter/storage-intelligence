@@ -16,38 +16,48 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/providers/SettingsProvider";
+import { CustomModelDialog } from "./CustomModelDialog";
 import { formatProviderName } from "./format";
 import { useModels } from "./useModels";
 
 export function ModelSelector() {
 	const { data: models, isPending, isError, error, refetch } = useModels();
-	const { modelId, setModelId } = useSettings();
+	const { modelId, setModelId, customModels } = useSettings();
 
-	// Default to the first returned entry without hardcoding IDs
+	const allModels = useMemo(
+		() => [...(models ?? []), ...customModels],
+		[models, customModels],
+	);
+
+	const providers = useMemo(
+		() => Array.from(new Set((models ?? []).map((model) => model.provider))),
+		[models],
+	);
+
+	// Default to the first available entry without hardcoding IDs
 	useEffect(() => {
-		if (models && models.length > 0) {
-			const currentIsValid = models.some((m) => m.id === modelId);
+		if (allModels.length > 0) {
+			const currentIsValid = allModels.some((m) => m.id === modelId);
 			if (!modelId || !currentIsValid) {
-				setModelId(models[0].id);
+				setModelId(allModels[0].id);
 			}
 		}
-	}, [models, modelId, setModelId]);
+	}, [allModels, modelId, setModelId]);
 
 	// Group models by provider
 	const groupedByProvider = useMemo(() => {
-		if (!models) return [];
-		const groups = new Map<string, typeof models>();
-		for (const model of models) {
+		const groups = new Map<string, typeof allModels>();
+		for (const model of allModels) {
 			const existing = groups.get(model.provider) ?? [];
 			existing.push(model);
 			groups.set(model.provider, existing);
 		}
 		return Array.from(groups.entries());
-	}, [models]);
+	}, [allModels]);
 
 	const selectedModel = useMemo(
-		() => models?.find((m) => m.id === modelId),
-		[models, modelId],
+		() => allModels.find((m) => m.id === modelId),
+		[allModels, modelId],
 	);
 
 	if (isPending) {
@@ -86,7 +96,7 @@ export function ModelSelector() {
 		);
 	}
 
-	if (!models || models.length === 0) {
+	if (allModels.length === 0) {
 		return (
 			<div className="space-y-2">
 				<Label htmlFor="model-select">AI Model</Label>
@@ -103,18 +113,21 @@ export function ModelSelector() {
 				<Label htmlFor="model-select" className="font-medium text-sm">
 					AI Model
 				</Label>
-				{selectedModel && (
-					<span
-						className={cn(
-							"rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider",
-							selectedModel.mode === "local"
-								? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-								: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
-						)}
-					>
-						{selectedModel.mode === "local" ? "Local" : "Cloud"}
-					</span>
-				)}
+				<div className="flex items-center gap-2">
+					{selectedModel && (
+						<span
+							className={cn(
+								"rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider",
+								selectedModel.mode === "local"
+									? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+									: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
+							)}
+						>
+							{selectedModel.mode === "local" ? "Local" : "Cloud"}
+						</span>
+					)}
+					<CustomModelDialog providers={providers} />
+				</div>
 			</div>
 
 			<Select

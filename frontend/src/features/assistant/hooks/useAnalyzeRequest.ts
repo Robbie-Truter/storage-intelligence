@@ -3,12 +3,22 @@ import { useModels } from "@/features/settings/useModels";
 import { useSettings } from "@/providers/SettingsProvider";
 
 export function useAnalyzeRequest() {
-	const { modelId, apiKeys } = useSettings();
+	const { modelId, apiKeys, customModels } = useSettings();
 	const { data: models = [] } = useModels();
 
+	const allModels = useMemo(
+		() => [...models, ...customModels],
+		[models, customModels],
+	);
+
 	const selectedModel = useMemo(
-		() => models.find((model) => model.id === modelId) ?? null,
-		[models, modelId],
+		() => allModels.find((model) => model.id === modelId) ?? null,
+		[allModels, modelId],
+	);
+
+	const isCustomModel = useMemo(
+		() => customModels.some((model) => model.id === modelId),
+		[customModels, modelId],
 	);
 
 	const apiKey = useMemo(() => {
@@ -36,6 +46,7 @@ export function useAnalyzeRequest() {
 	return {
 		modelId,
 		selectedModel,
+		isCustomModel,
 		apiKey,
 		hasKey,
 	};

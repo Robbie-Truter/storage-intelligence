@@ -145,9 +145,7 @@ def _allowed_tools() -> dict[str, BaseTool]:
     The manager filters the MCP tools to the allowlist when it opens the
     connection, so the agent is given exactly these.
     """
-    return {
-        name: _structured_tool(name, TOOL_RESULT) for name in READONLY_TOOL_ALLOWLIST
-    }
+    return {name: _structured_tool(name, TOOL_RESULT) for name in READONLY_TOOL_ALLOWLIST}
 
 
 def _agent_client(fake_manager: FakeManager) -> TestClient:
@@ -171,14 +169,79 @@ def test_models_lists_the_catalog_without_mcp_or_credentials(
 def test_analyze_rejects_a_model_outside_the_catalog() -> None:
     manager = FakeManager(tools=_allowed_tools())
 
-    response = _agent_client(manager).post(
-        "/api/agent/analyze", json={"model": "not-a-model"}
-    )
+    response = _agent_client(manager).post("/api/agent/analyze", json={"model": "not-a-model"})
 
     assert response.status_code == 422
     detail = response.json()["detail"]
     assert "not-a-model" in detail
     assert "openai-gpt-4.1" in detail
+
+
+def test_analyze_accepts_a_custom_model_for_a_supported_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_model = FakeChatModel(messages=iter([AIMessage(content="Nothing big here.")]))
+    selected: list[str] = []
+    captured: dict[str, Any] = {}
+
+    def _init_chat_model(model: str, **kwargs: Any) -> FakeChatModel:
+        selected.append(model)
+        captured.update(kwargs)
+        return fake_model
+
+    monkeypatch.setattr(storage_agent, "init_chat_model", _init_chat_model)
+    manager = FakeManager(tools=_allowed_tools())
+
+    response = _agent_client(manager).post(
+        "/api/agent/analyze",
+        json={
+            "model": "custom-openai-gpt-4o",
+            "provider": "openai",
+            "model_name": "gpt-4o",
+            "api_key": "client-key",
+            "path": "/tmp",
+        },
+    )
+
+    assert response.status_code == 200
+    assert selected == ["openai:gpt-4o"]
+    assert captured["api_key"] == "client-key"
+
+
+def test_analyze_rejects_a_custom_model_for_an_unsupported_provider() -> None:
+    manager = FakeManager(tools=_allowed_tools())
+
+    response = _agent_client(manager).post(
+        "/api/agent/analyze",
+        json={
+            "model": "custom-anthropic-claude",
+            "provider": "anthropic",
+            "model_name": "claude-sonnet",
+            "api_key": "client-key",
+        },
+    )
+
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    assert "anthropic" in detail
+    assert "openai" in detail
+
+
+def test_analyze_rejects_a_custom_model_without_a_name() -> None:
+    manager = FakeManager(tools=_allowed_tools())
+
+    response = _agent_client(manager).post(
+        "/api/agent/analyze",
+        json={
+            "model": "custom-openai-empty",
+            "provider": "openai",
+            "model_name": "   ",
+            "api_key": "client-key",
+        },
+    )
+
+    assert response.status_code == 422
+    assert "model_name" in response.json()["detail"]
 
 
 def test_analyze_uses_the_model_selected_in_the_body(
@@ -368,9 +431,7 @@ def test_analyze_when_the_connection_breaks_returns_503(
     )
     manager = FakeManager(
         tools={
-            "file_info": _failing_tool(
-                "file_info", ConnectionResetError("MCP pipe closed")
-            )
+            "file_info": _failing_tool("file_info", ConnectionResetError("MCP pipe closed"))
         }
     )
 
@@ -386,13 +447,9 @@ def test_analyze_when_the_connection_breaks_returns_503(
 def test_analyze_when_the_step_cap_is_reached_returns_400(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    replies = [
-        _tool_call("find_large_files", {"path": "/tmp"}, f"c{i}") for i in range(20)
-    ]
+    replies = [_tool_call("find_large_files", {"path": "/tmp"}, f"c{i}") for i in range(20)]
     _fake_model(monkeypatch, *replies)
-    monkeypatch.setattr(
-        agent_router, "get_settings", lambda: Settings(agent_max_iterations=4)
-    )
+    monkeypatch.setattr(agent_router, "get_settings", lambda: Settings(agent_max_iterations=4))
     manager = FakeManager(tools=_allowed_tools())
 
     response = _agent_client(manager).post(

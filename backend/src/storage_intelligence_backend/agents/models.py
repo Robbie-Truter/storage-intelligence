@@ -17,6 +17,8 @@ class ModelOption:
         return f"{self.provider}:{self.model_name}"
 
 
+SUPPORTED_PROVIDERS: tuple[str, ...] = ("openai", "google_genai", "ollama")
+
 MODEL_CATALOG = [
     ModelOption(
         id="openai-gpt-4.1",
@@ -73,3 +75,14 @@ MODEL_CATALOG = [
 def find_model(model_id: str) -> ModelOption | None:
     """Return the catalogue entry with ``model_id``, or ``None``."""
     return next((option for option in MODEL_CATALOG if option.id == model_id), None)
+
+
+def custom_model_option(model_id: str, provider: str, model_name: str) -> ModelOption:
+    """Build a per-request option for a model outside the catalogue."""
+    return ModelOption(
+        id=model_id,
+        label=model_name,
+        provider=provider,
+        model_name=model_name,
+        mode="local" if provider == "ollama" else "cloud",
+    )

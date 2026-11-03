@@ -24,7 +24,8 @@ export function AssistantPage() {
 	const conversationRef = useRef<HTMLDivElement>(null);
 
 	const analyzeMutation = useAnalyze();
-	const { modelId, selectedModel, apiKey, hasKey } = useAnalyzeRequest();
+	const { modelId, selectedModel, isCustomModel, apiKey, hasKey } =
+		useAnalyzeRequest();
 
 	const trimmedPath = path.trim();
 	const trimmedQuestion = question.trim();
@@ -68,6 +69,12 @@ export function AssistantPage() {
 
 		const request = {
 			model: modelId,
+			...(isCustomModel && selectedModel
+				? {
+						provider: selectedModel.provider,
+						model_name: selectedModel.model_name,
+					}
+				: {}),
 			...(trimmedPath ? { path: trimmedPath } : {}),
 			...(trimmedQuestion ? { question: trimmedQuestion } : {}),
 			...(apiKey ? { api_key: apiKey } : {}),
@@ -151,7 +158,7 @@ export function AssistantPage() {
 							initial={{ opacity: 0, x: -8 }}
 							animate={{ opacity: 1, x: 0 }}
 							exit={{ opacity: 0, x: -8 }}
-							transition={{ duration: 0.4, delay: 0.1 }}
+							transition={{ duration: 0.2, delay: 0.1 }}
 							className="flex items-center justify-start pl-1"
 						>
 							<div className="flex items-center gap-1.5 rounded-lg bg-muted px-2 py-2">

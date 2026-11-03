@@ -10,7 +10,8 @@ import { useModels } from "./useModels";
 
 export function ProviderKeyFields() {
 	const { data: models, isPending, isError } = useModels();
-	const { apiKeys, setApiKey, clearApiKey, modelId } = useSettings();
+	const { apiKeys, setApiKey, clearApiKey, modelId, customModels } =
+		useSettings();
 	const [revealedProviders, setRevealedProviders] = useState<
 		Record<string, boolean>
 	>({});
@@ -22,13 +23,18 @@ export function ProviderKeyFields() {
 		return unique.filter((p) => p.toLowerCase() !== "ollama");
 	}, [models]);
 
-	const selectedModel = models?.find((model) => model.id === modelId);
+	const allModels = useMemo(
+		() => [...(models ?? []), ...customModels],
+		[models, customModels],
+	);
+
+	const selectedModel = allModels.find((model) => model.id === modelId);
 	const selectedProvider = selectedModel?.provider;
 
-	const hasOllama = useMemo(() => {
-		if (!models) return false;
-		return models.some((m) => m.provider.toLowerCase() === "ollama");
-	}, [models]);
+	const hasOllama = useMemo(
+		() => allModels.some((m) => m.provider.toLowerCase() === "ollama"),
+		[allModels],
+	);
 
 	const toggleReveal = (provider: string) => {
 		setRevealedProviders((prev) => ({
