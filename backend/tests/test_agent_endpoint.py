@@ -166,15 +166,12 @@ def test_models_lists_the_catalog_without_mcp_or_credentials(
     assert response.json()
 
 
-def test_analyze_rejects_a_model_outside_the_catalog() -> None:
+def test_analyze_rejects_missing_provider_or_model_name() -> None:
     manager = FakeManager(tools=_allowed_tools())
 
     response = _agent_client(manager).post("/api/agent/analyze", json={"model": "not-a-model"})
 
     assert response.status_code == 422
-    detail = response.json()["detail"]
-    assert "not-a-model" in detail
-    assert "openai-gpt-4.1" in detail
 
 
 def test_analyze_accepts_a_custom_model_for_a_supported_provider(
@@ -262,6 +259,8 @@ def test_analyze_uses_the_model_selected_in_the_body(
     response = _agent_client(manager).post(
         "/api/agent/analyze",
         json={
+            "provider": "google_genai",
+            "model_name": "gemini-2.5-flash",
             "model": "google-gemini-2.5-flash",
             "api_key": "client-key",
             "path": "/tmp",
@@ -277,7 +276,12 @@ def test_analyze_requires_an_api_key_for_cloud_models() -> None:
     manager = FakeManager(tools=_allowed_tools())
 
     response = _agent_client(manager).post(
-        "/api/agent/analyze", json={"model": "openai-gpt-4.1"}
+        "/api/agent/analyze",
+        json={
+            "provider": "openai",
+            "model_name": "gpt-4.1",
+            "model": "openai-gpt-4.1",
+        },
     )
 
     assert response.status_code == 422
@@ -299,7 +303,13 @@ def test_analyze_allows_ollama_without_an_api_key(
     manager = FakeManager(tools=_allowed_tools())
 
     response = _agent_client(manager).post(
-        "/api/agent/analyze", json={"model": "ollama-llama3.1", "path": "/tmp"}
+        "/api/agent/analyze",
+        json={
+            "provider": "ollama",
+            "model_name": "llama3.1",
+            "model": "ollama-llama3.1",
+            "path": "/tmp",
+        },
     )
 
     assert response.status_code == 200
@@ -319,7 +329,13 @@ def test_analyze_returns_the_summary_and_the_tool_calls(
 
     response = _agent_client(manager).post(
         "/api/agent/analyze",
-        json={"model": "openai-gpt-4.1", "api_key": "test-key", "path": "/tmp"},
+        json={
+            "provider": "openai",
+            "model_name": "gpt-4.1",
+            "model": "openai-gpt-4.1",
+            "api_key": "test-key",
+            "path": "/tmp",
+        },
     )
 
     assert response.status_code == 200
@@ -344,7 +360,13 @@ def test_analyze_without_a_question_asks_about_the_path(
 
     response = _agent_client(manager).post(
         "/api/agent/analyze",
-        json={"model": "openai-gpt-4.1", "api_key": "test-key", "path": "/tmp"},
+        json={
+            "provider": "openai",
+            "model_name": "gpt-4.1",
+            "model": "openai-gpt-4.1",
+            "api_key": "test-key",
+            "path": "/tmp",
+        },
     )
 
     assert response.status_code == 200
@@ -361,6 +383,8 @@ def test_analyze_sends_the_question_and_the_path_to_the_model(
     response = _agent_client(manager).post(
         "/api/agent/analyze",
         json={
+            "provider": "openai",
+            "model_name": "gpt-4.1",
             "model": "openai-gpt-4.1",
             "api_key": "test-key",
             "path": "/tmp",
@@ -381,7 +405,13 @@ def test_analyze_without_a_path_asks_about_the_default_location(
     manager = FakeManager(tools=_allowed_tools())
 
     response = _agent_client(manager).post(
-        "/api/agent/analyze", json={"model": "openai-gpt-4.1", "api_key": "test-key"}
+        "/api/agent/analyze",
+        json={
+            "provider": "openai",
+            "model_name": "gpt-4.1",
+            "model": "openai-gpt-4.1",
+            "api_key": "test-key",
+        },
     )
 
     assert response.status_code == 200
@@ -400,6 +430,8 @@ def test_analyze_with_only_a_question_keeps_the_question(
     response = _agent_client(manager).post(
         "/api/agent/analyze",
         json={
+            "provider": "openai",
+            "model_name": "gpt-4.1",
             "model": "openai-gpt-4.1",
             "api_key": "test-key",
             "question": "What is biggest?",
@@ -414,7 +446,13 @@ def test_analyze_with_only_a_question_keeps_the_question(
 def test_analyze_without_an_mcp_manager_returns_503(client: TestClient) -> None:
     response = client.post(
         "/api/agent/analyze",
-        json={"model": "openai-gpt-4.1", "api_key": "test-key", "path": "/tmp"},
+        json={
+            "provider": "openai",
+            "model_name": "gpt-4.1",
+            "model": "openai-gpt-4.1",
+            "api_key": "test-key",
+            "path": "/tmp",
+        },
     )
 
     assert response.status_code == 503
@@ -437,7 +475,13 @@ def test_analyze_when_the_connection_breaks_returns_503(
 
     response = _agent_client(manager).post(
         "/api/agent/analyze",
-        json={"model": "openai-gpt-4.1", "api_key": "test-key", "path": "/tmp"},
+        json={
+            "provider": "openai",
+            "model_name": "gpt-4.1",
+            "model": "openai-gpt-4.1",
+            "api_key": "test-key",
+            "path": "/tmp",
+        },
     )
 
     assert response.status_code == 503
@@ -454,7 +498,13 @@ def test_analyze_when_the_step_cap_is_reached_returns_400(
 
     response = _agent_client(manager).post(
         "/api/agent/analyze",
-        json={"model": "openai-gpt-4.1", "api_key": "test-key", "path": "/tmp"},
+        json={
+            "provider": "openai",
+            "model_name": "gpt-4.1",
+            "model": "openai-gpt-4.1",
+            "api_key": "test-key",
+            "path": "/tmp",
+        },
     )
 
     assert response.status_code == 400
@@ -474,7 +524,13 @@ def test_analyze_when_the_model_cannot_be_built_returns_503(
 
     response = _agent_client(manager).post(
         "/api/agent/analyze",
-        json={"model": "openai-gpt-4.1", "api_key": "test-key", "path": "/tmp"},
+        json={
+            "provider": "openai",
+            "model_name": "gpt-4.1",
+            "model": "openai-gpt-4.1",
+            "api_key": "test-key",
+            "path": "/tmp",
+        },
     )
 
     assert response.status_code == 503
@@ -498,7 +554,13 @@ def test_analyze_never_binds_or_calls_trash_path(
 
     response = _agent_client(manager).post(
         "/api/agent/analyze",
-        json={"model": "openai-gpt-4.1", "api_key": "test-key", "path": "/tmp"},
+        json={
+            "provider": "openai",
+            "model_name": "gpt-4.1",
+            "model": "openai-gpt-4.1",
+            "api_key": "test-key",
+            "path": "/tmp",
+        },
     )
 
     assert response.status_code == 200

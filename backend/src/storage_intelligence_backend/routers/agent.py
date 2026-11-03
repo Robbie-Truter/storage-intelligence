@@ -11,8 +11,6 @@ from langgraph.errors import GraphRecursionError
 from ..agents.models import (
     MODEL_CATALOG,
     SUPPORTED_PROVIDERS,
-    custom_model_option,
-    find_model,
 )
 from ..agents.storage_agent import build_agent, run_readonly_analysis
 from ..config import get_settings
@@ -50,13 +48,10 @@ async def analyze(
 ) -> AgentAnalyzeResponse:
     """Analyze the storage usage under ``path`` with the read-only agent.
 
-    ``model`` is either an ``id`` from ``GET /api/agent/models`` or a
-    client-generated id for a custom model. For a custom model, ``provider``
-    and ``model_name`` are required; the provider must be one of the installed
-    integrations. Catalogue ids are validated before anything is built.
-    ``api_key`` is the client-supplied key for that provider (required for
-    cloud models, unused for Ollama). ``path`` is optional - without it the
-    agent starts from the default
+    ``provider`` and ``model_name`` identify the model to build; the provider
+    must be one of the installed integrations. ``api_key`` is the client-supplied
+    key for that provider (required for cloud models, unused for Ollama).
+    ``path`` is optional - without it the agent starts from the default
     location, which is where the MCP tools fall back to. ``question`` is
     optional too: without one the agent looks for what takes the most space.
 
@@ -68,62 +63,52 @@ async def analyze(
         200: the agent answered; the body carries its ``summary`` and the
             ``tool_calls`` it made.
         400: the agent used up its step limit before it could answer.
-        422: ``model`` is not in the catalogue, or ``api_key`` is missing for a
-            cloud provider.
+        422: ``provider`` is unsupported, ``model_name`` is empty, or ``api_key``
+            is missing for a cloud provider.
         503: the MCP server is unavailable, or the chat model could not be
             constructed (for example, its provider integration failed to load).
     """
     settings = get_settings()
 
-    option = find_model(request.model)
+    provider = request.provider.strip().lower() if request.provider else None
+    model_name = request.model_name.strip() if request.model_name else None
 
-    if option is None:
-        provider = request.provider.strip().lower() if request.provider else None
-        model_name = request.model_name.strip() if request.model_name else None
+    if not provider:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="provider is required.",
+        )
 
-        if provider is None or model_name is None:
-            supported = ", ".join(model.id for model in MODEL_CATALOG)
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                detail=(
-                    f"Unsupported model {request.model!r}. Choose one of: "
-                    f"{supported}, or provide provider and model_name for a "
-                    "custom model."
-                ),
-            )
+    if provider not in SUPPORTED_PROVIDERS:
+        supported_providers = ", ".join(SUPPORTED_PROVIDERS)
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=(
+                f"Unsupported provider {provider!r}. Choose one of: {supported_providers}."
+            ),
+        )
 
-        if provider not in SUPPORTED_PROVIDERS:
-            supported_providers = ", ".join(SUPPORTED_PROVIDERS)
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                detail=(
-                    f"Unsupported provider {provider!r}. Choose one of: {supported_providers}."
-                ),
-            )
-
-        if not model_name:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                detail="model_name must not be empty for a custom model.",
-            )
-
-        option = custom_model_option(request.model, provider, model_name)
+    if not model_name:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="model_name must not be empty.",
+        )
 
     api_key = request.api_key.get_secret_value() if request.api_key else None
 
-    if option.provider != "ollama" and not api_key:
+    if provider != "ollama" and not api_key:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=f"api_key is required for the {option.provider} provider.",
+            detail=f"api_key is required for the {provider} provider.",
         )
 
     try:
         agent = build_agent(
-            model=option.model_string,
+            model=f"{provider}:{model_name}",
             manager=manager,
             temperature=settings.agent_temperature,
             max_iterations=settings.agent_max_iterations,
-            api_key=api_key if option.provider != "ollama" else None,
+            api_key=api_key if provider != "ollama" else None,
         )
     except Exception as exc:
         raise HTTPException(

@@ -191,9 +191,7 @@ def test_execute_reports_a_stale_path_in_a_mixed_batch(
     assert response.json()["missing_paths"] == ["/tmp/gone"]
     assert response.json()["deleted"] == ["/tmp/a"]
     assert response.json()["total_valid_paths"] == 1
-    assert fake.calls == [
-        ("trash_path", {"paths": ["/tmp/a", "/tmp/gone"], "confirm": True})
-    ]
+    assert fake.calls == [("trash_path", {"paths": ["/tmp/a", "/tmp/gone"], "confirm": True})]
 
 
 def test_execute_all_missing_returns_400(fake_manager: FakeMCPClient) -> None:

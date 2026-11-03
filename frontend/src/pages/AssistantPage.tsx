@@ -24,8 +24,7 @@ export function AssistantPage() {
 	const conversationRef = useRef<HTMLDivElement>(null);
 
 	const analyzeMutation = useAnalyze();
-	const { modelId, selectedModel, isCustomModel, apiKey, hasKey } =
-		useAnalyzeRequest();
+	const { modelId, selectedModel, apiKey, hasKey } = useAnalyzeRequest();
 
 	const trimmedPath = path.trim();
 	const trimmedQuestion = question.trim();
@@ -69,12 +68,8 @@ export function AssistantPage() {
 
 		const request = {
 			model: modelId,
-			...(isCustomModel && selectedModel
-				? {
-						provider: selectedModel.provider,
-						model_name: selectedModel.model_name,
-					}
-				: {}),
+			provider: selectedModel?.provider ?? "",
+			model_name: selectedModel?.model_name ?? "",
 			...(trimmedPath ? { path: trimmedPath } : {}),
 			...(trimmedQuestion ? { question: trimmedQuestion } : {}),
 			...(apiKey ? { api_key: apiKey } : {}),

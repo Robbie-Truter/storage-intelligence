@@ -67,9 +67,9 @@ export interface AgentModelOption {
 }
 
 export interface AgentAnalyzeRequest {
-	model: string;
-	provider?: string;
-	model_name?: string;
+	provider: string;
+	model_name: string;
+	model?: string;
 	api_key?: string;
 	path?: string;
 	question?: string;

@@ -164,13 +164,9 @@ def test_agent_is_given_only_the_allowlisted_tools(
 async def test_agent_stops_when_it_runs_out_of_steps(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    replies = [
-        _tool_call("find_large_files", {"path": "/data"}, f"c{i}") for i in range(20)
-    ]
+    replies = [_tool_call("find_large_files", {"path": "/data"}, f"c{i}") for i in range(20)]
     _fake_model(monkeypatch, *replies)
-    manager = FakeManager(
-        tools={"find_large_files": _structured_tool("find_large_files", {})}
-    )
+    manager = FakeManager(tools={"find_large_files": _structured_tool("find_large_files", {})})
 
     agent = build_agent(
         model="openai:gpt-4.1",
@@ -305,9 +301,7 @@ async def test_analysis_reports_a_broken_connection_as_unavailable(
     )
     manager = FakeManager(
         tools={
-            "file_info": _failing_tool(
-                "file_info", ConnectionResetError("MCP pipe closed")
-            )
+            "file_info": _failing_tool("file_info", ConnectionResetError("MCP pipe closed"))
         }
     )
 
@@ -325,13 +319,9 @@ async def test_analysis_reports_a_broken_connection_as_unavailable(
 async def test_analysis_reports_the_step_cap_as_it_is(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    replies = [
-        _tool_call("find_large_files", {"path": "/data"}, f"c{i}") for i in range(20)
-    ]
+    replies = [_tool_call("find_large_files", {"path": "/data"}, f"c{i}") for i in range(20)]
     _fake_model(monkeypatch, *replies)
-    manager = FakeManager(
-        tools={"find_large_files": _structured_tool("find_large_files", {})}
-    )
+    manager = FakeManager(tools={"find_large_files": _structured_tool("find_large_files", {})})
 
     agent = build_agent(
         model="openai:gpt-4.1",

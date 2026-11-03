@@ -16,11 +16,6 @@ export function useAnalyzeRequest() {
 		[allModels, modelId],
 	);
 
-	const isCustomModel = useMemo(
-		() => customModels.some((model) => model.id === modelId),
-		[customModels, modelId],
-	);
-
 	const apiKey = useMemo(() => {
 		if (!selectedModel) {
 			return undefined;
@@ -46,7 +41,6 @@ export function useAnalyzeRequest() {
 	return {
 		modelId,
 		selectedModel,
-		isCustomModel,
 		apiKey,
 		hasKey,
 	};
