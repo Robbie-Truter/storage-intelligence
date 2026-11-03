@@ -109,8 +109,6 @@ async def run_readonly_analysis(
         MCPUnavailable: The connection to the MCP server broke during the run.
         GraphRecursionError: The agent used up its steps without finishing.
     """
-    if path is None or (isinstance(path, str) and not path.strip()):
-        path = os.path.expanduser("~")
 
     prompt = _build_prompt(path, question)
 
@@ -142,16 +140,20 @@ def _build_prompt(path: str | None = None, question: str | None = None) -> str:
     The tool usage rules are included before the user's request to guide
     the agent's decisions about when filesystem tools are appropriate.
     """
+    if path is None or (isinstance(path, str) and not path.strip()):
+        home_directory = os.path.expanduser("~")
+        path = (
+            f"{home_directory} (This is default path since user did not supply any, "
+            "only use it for analysis if user asks for it)"
+        )
+
     if question and question.strip():
         prompt = question.strip()
 
     else:
         prompt = "Analyze the storage usage and report what takes the most space."
 
-    if path:
-        prompt = f"{prompt}\n\nTarget path: {path}"
-
-    return prompt
+    return f"User prompt:\n{prompt} \n\n Target path:\n{path}"
 
 
 def _final_summary(messages: list[Any]) -> str:
