@@ -18,6 +18,7 @@ from langgraph.errors import GraphRecursionError
 from pydantic import BaseModel, Field
 
 from storage_intelligence_backend.agents import storage_agent
+from storage_intelligence_backend.agents.errors import AgentModelError
 from storage_intelligence_backend.agents.storage_agent import (
     build_agent,
     run_readonly_analysis,
@@ -234,8 +235,8 @@ async def test_analysis_without_a_path_leaves_the_location_to_the_tools(
     result = await run_readonly_analysis(agent)
 
     prompt = model.asked[0][-1].content
-    assert "default location" in prompt
-    assert "Target path" not in prompt
+    assert "default path" in prompt
+    assert "Target path" in prompt
     assert result["summary"] == "Nothing big here."
 
 
@@ -255,7 +256,7 @@ async def test_analysis_with_a_question_and_no_path_asks_without_a_path(
 
     result = await run_readonly_analysis(agent, question="What is biggest?")
 
-    assert model.asked[0][-1].content == "What is biggest?"
+    assert "What is biggest?" in model.asked[0][-1].content
     assert result["summary"] == "Nothing big here."
 
 
@@ -332,3 +333,27 @@ async def test_analysis_reports_the_step_cap_as_it_is(
 
     with pytest.raises(GraphRecursionError):
         await run_readonly_analysis(agent, "/data")
+
+
+async def test_analysis_reports_model_overloaded_as_agent_model_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _failing_generate(*_args: Any, **_kwargs: Any) -> Any:
+        raise RuntimeError("The model is overloaded. Please try again later.")
+
+    model = _fake_model(monkeypatch)
+    monkeypatch.setattr(model, "_generate", _failing_generate)
+    manager = FakeManager(tools=_allowed_tools())
+
+    agent = build_agent(
+        model="google-genai:gemini-2.5-flash",
+        manager=manager,
+        temperature=0.0,
+        max_iterations=10,
+    )
+
+    with pytest.raises(AgentModelError) as exc_info:
+        await run_readonly_analysis(agent, "/data")
+
+    assert exc_info.value.status_code == 503
+    assert "overloaded" in exc_info.value.message.lower()

@@ -8,6 +8,7 @@ tools and reports both its answer and the tools it used.
 from fastapi import APIRouter, Depends, HTTPException, status
 from langgraph.errors import GraphRecursionError
 
+from ..agents.errors import AgentModelError, format_model_error
 from ..agents.models import (
     MODEL_CATALOG,
     SUPPORTED_PROVIDERS,
@@ -111,10 +112,13 @@ async def analyze(
             api_key=api_key if provider != "ollama" else None,
         )
     except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Agent model is not available: {exc}",
-        ) from exc
+        status_code, message = format_model_error(exc)
+        detail = (
+            message
+            if not message.startswith("Agent model run failed: ")
+            else f"Agent model is not available: {exc}"
+        )
+        raise AgentModelError(detail, status_code=status_code) from exc
 
     try:
         result = await run_readonly_analysis(agent, request.path, request.question)

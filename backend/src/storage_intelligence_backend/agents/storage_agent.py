@@ -14,6 +14,7 @@ from langchain.chat_models import init_chat_model
 from langchain_core.messages import AIMessage, ToolMessage
 from langgraph.errors import GraphRecursionError
 
+from storage_intelligence_backend.agents.errors import AgentModelError, format_model_error
 from storage_intelligence_backend.mcp.errors import MCPError, MCPUnavailable
 from storage_intelligence_backend.mcp.manager import StorageMCPClient
 
@@ -107,6 +108,7 @@ async def run_readonly_analysis(
 
     Raises:
         MCPUnavailable: The connection to the MCP server broke during the run.
+        AgentModelError: The AI model or provider failed or is overloaded.
         GraphRecursionError: The agent used up its steps without finishing.
     """
 
@@ -116,8 +118,11 @@ async def run_readonly_analysis(
         result = await agent.ainvoke({"messages": [{"role": "user", "content": prompt}]})
     except (MCPError, GraphRecursionError):
         raise
-    except Exception as exc:
+    except ConnectionError as exc:
         raise MCPUnavailable(f"Agent run failed: {exc}") from exc
+    except Exception as exc:
+        status_code, clean_message = format_model_error(exc)
+        raise AgentModelError(clean_message, status_code=status_code) from exc
 
     messages = result.get("messages", [])
     return {

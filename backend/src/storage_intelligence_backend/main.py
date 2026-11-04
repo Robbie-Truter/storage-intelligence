@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from . import __version__
+from .agents.errors import AgentModelError
 from .config import get_settings
 from .mcp.errors import MCPToolError, MCPUnavailable
 from .mcp.manager import StorageMCPClient
@@ -78,6 +79,10 @@ def create_app() -> FastAPI:
     @app.exception_handler(MCPToolError)
     async def _mcp_tool_error(_: Request, exc: MCPToolError) -> JSONResponse:
         return JSONResponse(status_code=400, content={"detail": exc.to_detail()})
+
+    @app.exception_handler(AgentModelError)
+    async def _agent_model_error(_: Request, exc: AgentModelError) -> JSONResponse:
+        return JSONResponse(status_code=exc.status_code, content={"detail": exc.message})
 
     app.include_router(health.router)
     app.include_router(disk.router, prefix="/api")

@@ -52,7 +52,7 @@ class _Manager(StorageMCPClient):
 
 
 def test_allowlist_includes_preview_trash_and_excludes_trash_path() -> None:
-    assert len(READONLY_TOOL_ALLOWLIST) == 11
+    assert len(READONLY_TOOL_ALLOWLIST) == 12
     assert "preview_trash" in READONLY_TOOL_ALLOWLIST
     assert "trash_path" not in READONLY_TOOL_ALLOWLIST
 

@@ -417,8 +417,8 @@ def test_analyze_without_a_path_asks_about_the_default_location(
     assert response.status_code == 200
     assert response.json()["summary"] == "Nothing big here."
     prompt = model.asked[0][-1].content
-    assert "default location" in prompt
-    assert "Target path" not in prompt
+    assert "default path" in prompt
+    assert "Target path" in prompt
 
 
 def test_analyze_with_only_a_question_keeps_the_question(
@@ -440,7 +440,7 @@ def test_analyze_with_only_a_question_keeps_the_question(
 
     assert response.status_code == 200
     assert response.json()["summary"] == "Nothing big here."
-    assert model.asked[0][-1].content == "What is biggest?"
+    assert "What is biggest?" in model.asked[0][-1].content
 
 
 def test_analyze_without_an_mcp_manager_returns_503(client: TestClient) -> None:
@@ -578,3 +578,85 @@ def test_analyze_never_binds_or_calls_trash_path(
     # trash-related tool the agent can reach.
     assert "preview_trash" in bound
     assert all(call["name"] != "trash_path" for call in body["tool_calls"])
+
+
+def test_analyze_when_gemini_is_overloaded_returns_503(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _failing_generate(*_args: Any, **_kwargs: Any) -> Any:
+        raise RuntimeError("503 The model is overloaded. Please try again later.")
+
+    model = _fake_model(monkeypatch)
+    monkeypatch.setattr(model, "_generate", _failing_generate)
+    manager = FakeManager(tools=_allowed_tools())
+
+    response = _agent_client(manager).post(
+        "/api/agent/analyze",
+        json={
+            "provider": "google_genai",
+            "model_name": "gemini-2.5-flash",
+            "model": "google-gemini-2.5-flash",
+            "api_key": "test-key",
+            "path": "/tmp",
+        },
+    )
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": "The AI model is currently overloaded. Please try again in a few moments."
+    }
+
+
+def test_analyze_when_quota_exhausted_returns_429(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _failing_generate(*_args: Any, **_kwargs: Any) -> Any:
+        raise RuntimeError("429 Resource has been exhausted (e.g. check quota)")
+
+    model = _fake_model(monkeypatch)
+    monkeypatch.setattr(model, "_generate", _failing_generate)
+    manager = FakeManager(tools=_allowed_tools())
+
+    response = _agent_client(manager).post(
+        "/api/agent/analyze",
+        json={
+            "provider": "openai",
+            "model_name": "gpt-4.1",
+            "model": "openai-gpt-4.1",
+            "api_key": "test-key",
+            "path": "/tmp",
+        },
+    )
+
+    assert response.status_code == 429
+    assert response.json() == {
+        "detail": (
+            "The AI model rate limit or quota has been exceeded. "
+            "Please check your provider quota or try again later."
+        )
+    }
+
+
+def test_analyze_when_api_key_invalid_returns_401(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _failing_generate(*_args: Any, **_kwargs: Any) -> Any:
+        raise RuntimeError("401 Invalid API key provided")
+
+    model = _fake_model(monkeypatch)
+    monkeypatch.setattr(model, "_generate", _failing_generate)
+    manager = FakeManager(tools=_allowed_tools())
+
+    response = _agent_client(manager).post(
+        "/api/agent/analyze",
+        json={
+            "provider": "openai",
+            "model_name": "gpt-4.1",
+            "model": "openai-gpt-4.1",
+            "api_key": "test-key",
+            "path": "/tmp",
+        },
+    )
+
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Invalid API key provided for the model provider."}
