@@ -7,7 +7,7 @@ import { useAnalyze } from "@/features/assistant";
 import { AssistantConversation } from "@/features/assistant/components/AssistantConversation";
 import { Composer } from "@/features/assistant/components/Composer";
 import { useAnalyzeRequest } from "@/features/assistant/hooks/useAnalyzeRequest";
-import { getApiErrorMessage } from "@/lib/api/errors";
+import { formatErrorMessage, getApiErrorMessage } from "@/lib/api/errors";
 import type { AgentAnalyzeResponse } from "@/lib/api/types";
 
 type HistoryItem = {
@@ -94,7 +94,7 @@ export function AssistantPage() {
 						id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
 						type: "agent",
 						message: null,
-						error: getApiErrorMessage(error),
+						error: formatErrorMessage(getApiErrorMessage(error)),
 					},
 				]);
 			},
@@ -133,7 +133,9 @@ export function AssistantPage() {
 							>
 								{item.error ? (
 									<Alert variant="destructive">
-										<AlertDescription>{item.error}</AlertDescription>
+										<AlertDescription>
+											{formatErrorMessage(item.error)}
+										</AlertDescription>
 									</Alert>
 								) : item.message ? (
 									<AssistantConversation
