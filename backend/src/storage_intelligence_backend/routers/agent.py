@@ -142,20 +142,28 @@ async def analyze(
         raise AgentModelError(detail, status_code=503) from exc
 
     async def _event_generator() -> AsyncIterator[str]:
+        yield _sse_frame({"type": "start", "messageId": "assistant-1"})
+        yield _sse_frame({"type": "text-start", "id": "text-1"})
         try:
             async for event in stream_readonly_analysis(agent, request.path, request.question):
-                yield _sse_frame(event)
+                ui_event = _to_ui_events(event)
+                if ui_event:
+                    yield _sse_frame(ui_event)
+
+            yield _sse_frame({"type": "text-end", "id": "text-1"})
+            yield _sse_frame({"type": "finish"})
+            yield "data: [DONE]\n\n"
         except GraphRecursionError:
             detail = (
                 "The agent reached its step limit of "
                 f"{settings.agent_max_iterations} steps before it could answer."
             )
-            yield _sse_frame({"type": "error", "detail": detail})
+            yield _sse_frame({"type": "error", "errorText": detail})
         except (AgentModelError, MCPUnavailable) as exc:
             message = exc.message if isinstance(exc, AgentModelError) else str(exc)
-            yield _sse_frame({"type": "error", "detail": message})
+            yield _sse_frame({"type": "error", "errorText": message})
         except Exception as exc:
-            yield _sse_frame({"type": "error", "detail": f"Unexpected error: {exc}"})
+            yield _sse_frame({"type": "error", "errorText": f"Unexpected error: {exc}"})
 
     return StreamingResponse(
         _event_generator(),
@@ -163,11 +171,29 @@ async def analyze(
         headers={
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
+            "x-vercel-ai-ui-message-stream": "v1",
         },
     )
+
+
+def _to_ui_events(event: dict[str, Any]) -> dict[str, Any] | None:
+    if event["type"] == "text_delta":
+        return {
+            "type": "text-delta",
+            "id": "text-1",
+            "delta": event["content"],
+        }
+
+    if event["type"] == "tool_call":
+        return {
+            "type": "tool-input-available",
+            "toolCallId": event["id"],
+            "toolName": event["name"],
+            "input": event["args"],
+        }
 
 
 def _sse_frame(event: dict[str, Any]) -> str:
     """Format one event as a Server-Sent Events frame."""
     payload = json.dumps(event, ensure_ascii=False)
-    return f"event: {event.get('type', 'message')}\ndata: {payload}\n\n"
+    return f"data: {payload}\n\n\n"

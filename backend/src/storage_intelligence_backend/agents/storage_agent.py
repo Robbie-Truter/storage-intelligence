@@ -134,10 +134,20 @@ async def stream_readonly_analysis(
                 if run_id and run_id not in seen_tool_ids:
                     seen_tool_ids.add(run_id)
                     yield {
+                        "id": run_id,
                         "type": "tool_call",
                         "name": tool_name,
                         "args": event["data"].get("input") or {},
                     }
+
+            elif kind == "on_tool_end":
+                run_id = event.get("run_id", "")
+
+                yield {
+                    "type": "tool_result",
+                    "id": run_id,
+                    "result": event["data"].get("output"),
+                }
 
             # --- Final graph output: collect all messages for the summary ---
             elif kind == "on_chain_end" and event.get("name") == "LangGraph":
