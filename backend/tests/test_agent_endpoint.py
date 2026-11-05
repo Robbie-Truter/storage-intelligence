@@ -5,14 +5,17 @@ and no LLM credentials are needed. The fake manager hands over a tool
 catalogue and the fake model answers with fixed replies.
 """
 
+import json
+import re
+from collections.abc import Iterator
 from dataclasses import asdict
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
-from langchain_core.messages import AIMessage, BaseMessage
-from langchain_core.outputs import ChatResult
+from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage
+from langchain_core.outputs import ChatGenerationChunk, ChatResult
 from langchain_core.tools import BaseTool, StructuredTool
 from pydantic import BaseModel, Field
 
@@ -61,6 +64,43 @@ class FakeChatModel(GenericFakeChatModel):
     ) -> ChatResult:
         self.asked.append(list(messages))
         return super()._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
+
+    def _stream(
+        self,
+        messages: list[BaseMessage],
+        stop: Any = None,
+        run_manager: Any = None,
+        **kwargs: Any,
+    ) -> Iterator[ChatGenerationChunk]:
+        """Stream tool-call replies too; the base fake drops empty content."""
+        result = self._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
+        message = result.generations[0].message
+        if isinstance(message, AIMessage) and message.tool_calls:
+            yield ChatGenerationChunk(
+                message=AIMessageChunk(
+                    content="",
+                    tool_call_chunks=[
+                        {
+                            "name": call["name"],
+                            "args": json.dumps(call["args"]),
+                            "id": call["id"],
+                            "index": index,
+                            "type": "tool_call_chunk",
+                        }
+                        for index, call in enumerate(message.tool_calls)
+                    ],
+                )
+            )
+            return
+        content = message.content if isinstance(message, AIMessage) else ""
+        if isinstance(content, str) and content:
+            for token in re.split(r"(\s)", content):
+                chunk = ChatGenerationChunk(
+                    message=AIMessageChunk(content=token, id=message.id)
+                )
+                if run_manager:
+                    run_manager.on_llm_new_token(token, chunk=chunk)
+                yield chunk
 
 
 class FakeManager(StorageMCPClient):
@@ -154,6 +194,31 @@ def _agent_client(fake_manager: FakeManager) -> TestClient:
     app.state.mcp = None
     app.dependency_overrides[get_mcp_manager] = lambda: fake_manager
     return TestClient(app)
+
+
+def _sse_events(response: Any) -> list[dict[str, Any]]:
+    """The ``data`` payload of every SSE frame, in order."""
+    return [
+        json.loads(line[len("data: ") :])
+        for line in response.text.splitlines()
+        if line.startswith("data: ")
+    ]
+
+
+def _complete(response: Any) -> dict[str, Any]:
+    """The final ``complete`` event of a successful analysis stream."""
+    events = _sse_events(response)
+    complete = [event for event in events if event.get("type") == "complete"]
+    assert complete, events
+    return complete[-1]
+
+
+def _error(response: Any) -> str:
+    """The detail of the single ``error`` event of a failed stream."""
+    events = _sse_events(response)
+    errors = [event for event in events if event.get("type") == "error"]
+    assert errors, events
+    return errors[-1]["detail"]
 
 
 def test_models_lists_the_catalog_without_mcp_or_credentials(
@@ -339,7 +404,8 @@ def test_analyze_returns_the_summary_and_the_tool_calls(
     )
 
     assert response.status_code == 200
-    assert response.json() == {
+    assert _complete(response) == {
+        "type": "complete",
         "summary": "The biggest file is /tmp/a.",
         "tool_calls": [
             {
@@ -370,7 +436,7 @@ def test_analyze_without_a_question_asks_about_the_path(
     )
 
     assert response.status_code == 200
-    assert response.json()["summary"] == "Nothing big here."
+    assert _complete(response)["summary"] == "Nothing big here."
     assert "/tmp" in model.asked[0][-1].content
 
 
@@ -415,7 +481,7 @@ def test_analyze_without_a_path_asks_about_the_default_location(
     )
 
     assert response.status_code == 200
-    assert response.json()["summary"] == "Nothing big here."
+    assert _complete(response)["summary"] == "Nothing big here."
     prompt = model.asked[0][-1].content
     assert "default path" in prompt
     assert "Target path" in prompt
@@ -439,7 +505,7 @@ def test_analyze_with_only_a_question_keeps_the_question(
     )
 
     assert response.status_code == 200
-    assert response.json()["summary"] == "Nothing big here."
+    assert _complete(response)["summary"] == "Nothing big here."
     assert "What is biggest?" in model.asked[0][-1].content
 
 
@@ -459,7 +525,7 @@ def test_analyze_without_an_mcp_manager_returns_503(client: TestClient) -> None:
     assert response.json() == {"detail": "MCP server is not available"}
 
 
-def test_analyze_when_the_connection_breaks_returns_503(
+def test_analyze_when_the_connection_breaks_streams_an_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _fake_model(
@@ -484,11 +550,11 @@ def test_analyze_when_the_connection_breaks_returns_503(
         },
     )
 
-    assert response.status_code == 503
-    assert "MCP pipe closed" in response.json()["detail"]
+    assert response.status_code == 200
+    assert "MCP pipe closed" in _error(response)
 
 
-def test_analyze_when_the_step_cap_is_reached_returns_400(
+def test_analyze_when_the_step_cap_is_reached_streams_an_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     replies = [_tool_call("find_large_files", {"path": "/tmp"}, f"c{i}") for i in range(20)]
@@ -507,8 +573,8 @@ def test_analyze_when_the_step_cap_is_reached_returns_400(
         },
     )
 
-    assert response.status_code == 400
-    detail = response.json()["detail"]
+    assert response.status_code == 200
+    detail = _error(response)
     assert "4" in detail
     assert "step" in detail.lower()
 
@@ -564,7 +630,7 @@ def test_analyze_never_binds_or_calls_trash_path(
     )
 
     assert response.status_code == 200
-    body = response.json()
+    body = _complete(response)
 
     # The manager holds the raw trash_path tool ...
     assert "trash_path" in manager.state_tools
@@ -580,7 +646,7 @@ def test_analyze_never_binds_or_calls_trash_path(
     assert all(call["name"] != "trash_path" for call in body["tool_calls"])
 
 
-def test_analyze_when_gemini_is_overloaded_returns_503(
+def test_analyze_when_gemini_is_overloaded_streams_an_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     def _failing_generate(*_args: Any, **_kwargs: Any) -> Any:
@@ -601,13 +667,14 @@ def test_analyze_when_gemini_is_overloaded_returns_503(
         },
     )
 
-    assert response.status_code == 503
-    assert response.json() == {
-        "detail": "The AI model is currently overloaded. Please try again in a few moments."
-    }
+    assert response.status_code == 200
+    assert (
+        _error(response)
+        == "The AI model is currently overloaded. Please try again in a few moments."
+    )
 
 
-def test_analyze_when_quota_exhausted_returns_429(
+def test_analyze_when_quota_exhausted_streams_an_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     def _failing_generate(*_args: Any, **_kwargs: Any) -> Any:
@@ -628,16 +695,14 @@ def test_analyze_when_quota_exhausted_returns_429(
         },
     )
 
-    assert response.status_code == 429
-    assert response.json() == {
-        "detail": (
-            "The AI model rate limit or quota has been exceeded. "
-            "Please check your provider quota or try again later."
-        )
-    }
+    assert response.status_code == 200
+    assert _error(response) == (
+        "The AI model rate limit or quota has been exceeded. "
+        "Please check your provider quota or try again later."
+    )
 
 
-def test_analyze_when_api_key_invalid_returns_401(
+def test_analyze_when_api_key_invalid_streams_an_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     def _failing_generate(*_args: Any, **_kwargs: Any) -> Any:
@@ -658,5 +723,5 @@ def test_analyze_when_api_key_invalid_returns_401(
         },
     )
 
-    assert response.status_code == 401
-    assert response.json() == {"detail": "Invalid API key provided for the model provider."}
+    assert response.status_code == 200
+    assert _error(response) == "Invalid API key provided for the model provider."

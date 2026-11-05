@@ -86,7 +86,7 @@ backend/
 │   │   └── errors.py         # MCPError, MCPUnavailable, MCPToolError
 │   ├── agents/
 │   │   ├── models.py         # MODEL_CATALOG: the selectable models
-│   │   └── storage_agent.py  # build_agent(...) + run_readonly_analysis(...)
+│   │   └── storage_agent.py  # build_agent(...) + stream_readonly_analysis(...)
 │   ├── cleanup/
 │   │   └── preview_store.py  # unused scaffolding; v1 has no preview store
 │   └── routers/
@@ -114,7 +114,7 @@ Interactive API docs are served at `http://127.0.0.1:8000/docs`.
 | `GET /api/disk/count` | `count_files` | `path` (optional) |
 | `GET /api/disk/info` | `file_info` | `path` (optional) |
 | `GET /api/agent/models` | — | The selectable models; no MCP or provider key needed |
-| `POST /api/agent/analyze` | read-only agent | `{model, path?, question?}` → `{summary, tool_calls}` |
+| `POST /api/agent/analyze` | read-only agent | `{model, path?, question?}` → SSE stream (`tool_call`, `text_delta`, `complete`, `error`) |
 | `POST /api/cleanup/execute` | `trash_path(confirm=True)` | `{paths: [...]}` — the only mutating route |
 
 `path` is optional on the disk routes: when it is omitted the request is
@@ -190,18 +190,15 @@ through a Pydantic response model.
   "question": "What is taking the most space?"
 }
 
-// 200
-{
-  "summary": "The agent's final answer ...",
-  "tool_calls": [
-    {
-      "name": "directory_disk_usage",
-      "args": { "path": "/Users/me/Downloads" },
-      "status": "ok",
-      "result": { "path": "...", "entries": [...] }
-    }
-  ]
-}
+// 200 — text/event-stream
+event: tool_call
+data: {"type": "tool_call", "name": "directory_disk_usage", "args": {"path": "/Users/me/Downloads"}}
+
+event: text_delta
+data: {"type": "text_delta", "content": "The largest item is ..."}
+
+event: complete
+data: {"type": "complete", "summary": "The agent's final answer ...", "tool_calls": [{"name": "directory_disk_usage", "args": {"path": "/Users/me/Downloads"}, "status": "ok", "result": {"path": "...", "entries": []}}]}
 ```
 
 `model` is required and must be an `id` from `GET /api/agent/models`; an

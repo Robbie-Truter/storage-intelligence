@@ -1,18 +1,21 @@
 """Tests for the read-only agent.
 
 Covers the tool map the agent is given, the cap on how many steps it may take,
-and what ``run_readonly_analysis`` reports back. No LLM credentials are
+and what ``stream_readonly_analysis`` reports back. No LLM credentials are
 needed: the chat model is a fake with fixed replies, and the tools are local
 stubs that behave like the MCP tools - a structured answer, a reported error,
 and a broken connection.
 """
 
+import json
+import re
+from collections.abc import Iterator
 from typing import Any
 
 import pytest
 from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
-from langchain_core.messages import AIMessage, BaseMessage
-from langchain_core.outputs import ChatResult
+from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage
+from langchain_core.outputs import ChatGenerationChunk, ChatResult
 from langchain_core.tools import BaseTool, StructuredTool, ToolException
 from langgraph.errors import GraphRecursionError
 from pydantic import BaseModel, Field
@@ -21,7 +24,7 @@ from storage_intelligence_backend.agents import storage_agent
 from storage_intelligence_backend.agents.errors import AgentModelError
 from storage_intelligence_backend.agents.storage_agent import (
     build_agent,
-    run_readonly_analysis,
+    stream_readonly_analysis,
 )
 from storage_intelligence_backend.mcp.errors import MCPUnavailable
 from storage_intelligence_backend.mcp.manager import (
@@ -57,6 +60,43 @@ class FakeChatModel(GenericFakeChatModel):
     ) -> ChatResult:
         self.asked.append(list(messages))
         return super()._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
+
+    def _stream(
+        self,
+        messages: list[BaseMessage],
+        stop: Any = None,
+        run_manager: Any = None,
+        **kwargs: Any,
+    ) -> Iterator[ChatGenerationChunk]:
+        """Stream tool-call replies too; the base fake drops empty content."""
+        result = self._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
+        message = result.generations[0].message
+        if isinstance(message, AIMessage) and message.tool_calls:
+            yield ChatGenerationChunk(
+                message=AIMessageChunk(
+                    content="",
+                    tool_call_chunks=[
+                        {
+                            "name": call["name"],
+                            "args": json.dumps(call["args"]),
+                            "id": call["id"],
+                            "index": index,
+                            "type": "tool_call_chunk",
+                        }
+                        for index, call in enumerate(message.tool_calls)
+                    ],
+                )
+            )
+            return
+        content = message.content if isinstance(message, AIMessage) else ""
+        if isinstance(content, str) and content:
+            for token in re.split(r"(\s)", content):
+                chunk = ChatGenerationChunk(
+                    message=AIMessageChunk(content=token, id=message.id)
+                )
+                if run_manager:
+                    run_manager.on_llm_new_token(token, chunk=chunk)
+                yield chunk
 
 
 class FakeManager(StorageMCPClient):
@@ -144,6 +184,20 @@ def _allowed_tools() -> dict[str, BaseTool]:
     return {name: _stub_tool(name) for name in READONLY_TOOL_ALLOWLIST}
 
 
+async def _analysis_result(
+    agent: Any,
+    path: str | None = None,
+    question: str | None = None,
+) -> dict[str, Any]:
+    """Drain the event stream and return its final ``complete`` event."""
+    final: dict[str, Any] | None = None
+    async for event in stream_readonly_analysis(agent, path, question):
+        if event["type"] == "complete":
+            final = event
+    assert final is not None
+    return final
+
+
 def test_agent_is_given_only_the_allowlisted_tools(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -203,7 +257,7 @@ async def test_analysis_reports_the_tools_it_used(
         max_iterations=10,
     )
 
-    result = await run_readonly_analysis(agent, "/data", "What is biggest?")
+    result = await _analysis_result(agent, "/data", "What is biggest?")
 
     assert result["summary"] == "The biggest file is /data/a."
     assert result["tool_calls"] == [
@@ -232,7 +286,7 @@ async def test_analysis_without_a_path_leaves_the_location_to_the_tools(
         max_iterations=10,
     )
 
-    result = await run_readonly_analysis(agent)
+    result = await _analysis_result(agent)
 
     prompt = model.asked[0][-1].content
     assert "default path" in prompt
@@ -254,7 +308,7 @@ async def test_analysis_with_a_question_and_no_path_asks_without_a_path(
         max_iterations=10,
     )
 
-    result = await run_readonly_analysis(agent, question="What is biggest?")
+    result = await _analysis_result(agent, question="What is biggest?")
 
     assert "What is biggest?" in model.asked[0][-1].content
     assert result["summary"] == "Nothing big here."
@@ -279,7 +333,7 @@ async def test_analysis_records_a_tool_that_reported_an_error(
         max_iterations=10,
     )
 
-    result = await run_readonly_analysis(agent, "/data")
+    result = await _analysis_result(agent, "/data")
 
     assert result["summary"] == "That file is not there."
     assert result["tool_calls"] == [
@@ -314,7 +368,7 @@ async def test_analysis_reports_a_broken_connection_as_unavailable(
     )
 
     with pytest.raises(MCPUnavailable):
-        await run_readonly_analysis(agent, "/data")
+        await _analysis_result(agent, "/data")
 
 
 async def test_analysis_reports_the_step_cap_as_it_is(
@@ -332,7 +386,7 @@ async def test_analysis_reports_the_step_cap_as_it_is(
     )
 
     with pytest.raises(GraphRecursionError):
-        await run_readonly_analysis(agent, "/data")
+        await _analysis_result(agent, "/data")
 
 
 async def test_analysis_reports_model_overloaded_as_agent_model_error(
@@ -353,7 +407,7 @@ async def test_analysis_reports_model_overloaded_as_agent_model_error(
     )
 
     with pytest.raises(AgentModelError) as exc_info:
-        await run_readonly_analysis(agent, "/data")
+        await _analysis_result(agent, "/data")
 
     assert exc_info.value.status_code == 503
     assert "overloaded" in exc_info.value.message.lower()

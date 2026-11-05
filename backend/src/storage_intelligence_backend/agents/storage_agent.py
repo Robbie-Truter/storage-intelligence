@@ -7,6 +7,7 @@ manager's business - see ``StorageMCPClient.langchain_tools``.
 """
 
 import os
+from collections.abc import AsyncIterator
 from typing import Any
 
 from langchain.agents import create_agent
@@ -84,38 +85,65 @@ def build_agent(
     return agent.with_config({"recursion_limit": max_iterations})
 
 
-async def run_readonly_analysis(
+async def stream_readonly_analysis(
     agent: Any,
     path: str | None = None,
     question: str | None = None,
-) -> dict[str, Any]:
-    """Ask the agent about ``path`` and report back what it did.
+) -> AsyncIterator[dict[str, Any]]:
+    """Stream agent events for ``path`` as dicts ready for SSE framing.
 
-    ``path`` and ``question`` are both optional: without a path the agent
-    investigates the default location - the home directory the MCP tools fall
-    back to - and without a question it looks for what takes the most space.
+    Yields ``{"type": "tool_call", ...}`` events as the agent invokes tools,
+    ``{"type": "text_delta", "content": "..."}`` as the model writes its reply,
+    and a final ``{"type": "complete", "summary": "...", "tool_calls": [...]}``
+    when the run finishes.
 
-    Returns the agent's final answer as ``summary``, and one record per tool
-    call as ``tool_calls``. Each record has the tool ``name``, the ``args`` it
-    was called with, a ``status`` of ``ok`` or ``error``, and the ``result``.
-
-    The result is the tool's structured answer, which the MCP tools keep next
-    to the shortened text the model reads; the text is only used when a tool
-    reported an error and has no structured answer. A tool that reported an
-    error is recorded as failed - the agent carried on and answered anyway.
-    If the connection to the MCP server breaks, the run cannot finish and
-    ``MCPUnavailable`` is raised, which the app turns into a 503.
+    Errors from the model provider are translated to ``AgentModelError``;
+    MCP transport failures become ``MCPUnavailable``; a step-cap breach
+    propagates as ``GraphRecursionError``.
 
     Raises:
-        MCPUnavailable: The connection to the MCP server broke during the run.
+        MCPUnavailable: The MCP server connection broke during the run.
         AgentModelError: The AI model or provider failed or is overloaded.
-        GraphRecursionError: The agent used up its steps without finishing.
+        GraphRecursionError: The agent exceeded its step limit.
     """
-
     prompt = _build_prompt(path, question)
 
+    # astream_events is an async generator - do NOT await it.
+    seen_tool_ids: set[str] = set()
+    all_messages: list[Any] = []
+
     try:
-        result = await agent.ainvoke({"messages": [{"role": "user", "content": prompt}]})
+        async for event in agent.astream_events(
+            {"messages": [{"role": "user", "content": prompt}]},
+            version="v2",
+        ):
+            kind: str = event["event"]
+
+            # --- Incremental text from the final answer ---
+            if kind == "on_chat_model_stream":
+                chunk = event["data"].get("chunk")
+                if chunk is not None:
+                    text = chunk.text
+                    if text:
+                        yield {"type": "text_delta", "content": text}
+
+            # --- Tool invocations ---
+            elif kind == "on_tool_start":
+                tool_name = event.get("name", "")
+                run_id = event.get("run_id", "")
+                if run_id and run_id not in seen_tool_ids:
+                    seen_tool_ids.add(run_id)
+                    yield {
+                        "type": "tool_call",
+                        "name": tool_name,
+                        "args": event["data"].get("input") or {},
+                    }
+
+            # --- Final graph output: collect all messages for the summary ---
+            elif kind == "on_chain_end" and event.get("name") == "LangGraph":
+                output = event["data"].get("output") or {}
+                all_messages = output.get("messages", [])
+
     except (MCPError, GraphRecursionError):
         raise
     except ConnectionError as exc:
@@ -124,10 +152,10 @@ async def run_readonly_analysis(
         status_code, clean_message = format_model_error(exc)
         raise AgentModelError(clean_message, status_code=status_code) from exc
 
-    messages = result.get("messages", [])
-    return {
-        "summary": _final_summary(messages),
-        "tool_calls": _tool_call_records(messages),
+    yield {
+        "type": "complete",
+        "summary": _final_summary(all_messages),
+        "tool_calls": _tool_call_records(all_messages),
     }
 
 

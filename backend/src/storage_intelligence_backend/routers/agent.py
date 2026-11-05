@@ -1,11 +1,31 @@
 """LLM-driven agent endpoints (read-only tools only).
 
 ``GET /api/agent/models`` lists the models the agent can be configured with.
-``POST /api/agent/analyze`` runs the read-only agent over the allowlisted MCP
-tools and reports both its answer and the tools it used.
+``POST /api/agent/analyze`` runs the read-only agent and streams the run as
+Server-Sent Events (``text/event-stream``), one event per frame::
+
+    event: tool_call
+    data: {"type": "tool_call", "name": "...", "args": {...}}
+
+    event: text_delta
+    data: {"type": "text_delta", "content": "..."}
+
+    event: complete
+    data: {"type": "complete", "summary": "...", "tool_calls": [...]}
+
+    event: error
+    data: {"type": "error", "detail": "..."}
+
+``complete`` is the last event on a successful run; ``error`` is the last event
+when the run fails after the stream has opened.
 """
 
+import json
+from collections.abc import AsyncIterator
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from langgraph.errors import GraphRecursionError
 
 from ..agents.errors import AgentModelError, format_model_error
@@ -13,11 +33,12 @@ from ..agents.models import (
     MODEL_CATALOG,
     SUPPORTED_PROVIDERS,
 )
-from ..agents.storage_agent import build_agent, run_readonly_analysis
+from ..agents.storage_agent import build_agent, stream_readonly_analysis
 from ..config import get_settings
 from ..deps import get_mcp_manager
+from ..mcp.errors import MCPUnavailable
 from ..mcp.manager import StorageMCPClient
-from ..schemas import AgentAnalyzeRequest, AgentAnalyzeResponse, AgentModelOption
+from ..schemas import AgentAnalyzeRequest, AgentModelOption
 
 router = APIRouter(prefix="/agent", tags=["agent"])
 
@@ -42,12 +63,12 @@ async def list_models() -> list[AgentModelOption]:
     ]
 
 
-@router.post("/analyze", response_model=AgentAnalyzeResponse)
+@router.post("/analyze")
 async def analyze(
     request: AgentAnalyzeRequest,
     manager: StorageMCPClient = Depends(get_mcp_manager),
-) -> AgentAnalyzeResponse:
-    """Analyze the storage usage under ``path`` with the read-only agent.
+) -> StreamingResponse:
+    """Analyze the storage usage under ``path`` and stream the run as SSE.
 
     ``provider`` and ``model_name`` identify the model to build; the provider
     must be one of the installed integrations. ``api_key`` is the client-supplied
@@ -60,10 +81,12 @@ async def analyze(
     only the tools on the read-only allowlist - never the raw ``trash_path``
     tool.
 
+    The response is ``text/event-stream``. Each frame carries one event
+    (``tool_call``, ``text_delta``, then ``complete``); a failure after the
+    stream opens ends it with an ``error`` event.
+
     Status codes:
-        200: the agent answered; the body carries its ``summary`` and the
-            ``tool_calls`` it made.
-        400: the agent used up its step limit before it could answer.
+        200: the stream opened; inspect the ``event``/``type`` of each frame.
         422: ``provider`` is unsupported, ``model_name`` is empty, or ``api_key``
             is missing for a cloud provider.
         503: the MCP server is unavailable, or the chat model could not be
@@ -84,9 +107,7 @@ async def analyze(
         supported_providers = ", ".join(SUPPORTED_PROVIDERS)
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=(
-                f"Unsupported provider {provider!r}. Choose one of: {supported_providers}."
-            ),
+            detail=f"Unsupported provider {provider!r}. Choose one of: {supported_providers}.",
         )
 
     if not model_name:
@@ -112,23 +133,41 @@ async def analyze(
             api_key=api_key if provider != "ollama" else None,
         )
     except Exception as exc:
-        status_code, message = format_model_error(exc)
+        _, message = format_model_error(exc)
         detail = (
             message
             if not message.startswith("Agent model run failed: ")
             else f"Agent model is not available: {exc}"
         )
-        raise AgentModelError(detail, status_code=status_code) from exc
+        raise AgentModelError(detail, status_code=503) from exc
 
-    try:
-        result = await run_readonly_analysis(agent, request.path, request.question)
-    except GraphRecursionError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
+    async def _event_generator() -> AsyncIterator[str]:
+        try:
+            async for event in stream_readonly_analysis(agent, request.path, request.question):
+                yield _sse_frame(event)
+        except GraphRecursionError:
+            detail = (
                 "The agent reached its step limit of "
                 f"{settings.agent_max_iterations} steps before it could answer."
-            ),
-        ) from exc
+            )
+            yield _sse_frame({"type": "error", "detail": detail})
+        except (AgentModelError, MCPUnavailable) as exc:
+            message = exc.message if isinstance(exc, AgentModelError) else str(exc)
+            yield _sse_frame({"type": "error", "detail": message})
+        except Exception as exc:
+            yield _sse_frame({"type": "error", "detail": f"Unexpected error: {exc}"})
 
-    return AgentAnalyzeResponse(**result)
+    return StreamingResponse(
+        _event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+def _sse_frame(event: dict[str, Any]) -> str:
+    """Format one event as a Server-Sent Events frame."""
+    payload = json.dumps(event, ensure_ascii=False)
+    return f"event: {event.get('type', 'message')}\ndata: {payload}\n\n"
