@@ -45,14 +45,6 @@ export function AssistantPage() {
 				(part.state === "output-available" || part.state === "output-error"),
 		);
 
-	const getLiveToolCalls = (message: UIMessage) =>
-		message.parts.filter(
-			(part): part is AgentToolCall =>
-				part.type.startsWith("tool-") &&
-				"state" in part &&
-				(part.state === "input-streaming" || part.state === "input-available"),
-		);
-
 	const getTraceToolCalls = (message: UIMessage) =>
 		message.parts.filter(
 			(part): part is AgentToolCall =>
@@ -78,15 +70,9 @@ export function AssistantPage() {
 	const lastAssistantMessage =
 		lastMessage?.role === "assistant" ? lastMessage : undefined;
 
-	const liveToolCalls =
-		isLoading && lastAssistantMessage
-			? getLiveToolCalls(lastAssistantMessage)
-			: [];
-
-	const traceToolCalls =
-		!isLoading && lastAssistantMessage
-			? getTraceToolCalls(lastAssistantMessage)
-			: [];
+	const traceToolCalls = lastAssistantMessage
+		? getTraceToolCalls(lastAssistantMessage)
+		: [];
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: Only scroll when the message count changes.
 	useLayoutEffect(() => {
@@ -238,7 +224,8 @@ export function AssistantPage() {
 									•
 								</motion.span>
 							</div>
-							<ToolTrace toolCalls={liveToolCalls} />
+
+							<ToolTrace toolCalls={traceToolCalls} />
 						</motion.div>
 					) : null}
 				</AnimatePresence>

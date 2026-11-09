@@ -1,4 +1,6 @@
+import { motion } from "framer-motion";
 import { CircleAlert, CircleCheck, LoaderCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import {
 	Trace,
 	TraceCollapsible,
@@ -28,7 +30,7 @@ function ToolTraceLine({ call }: { call: AgentToolCall }) {
 	if (call.state === "input-streaming") {
 		return (
 			<TraceLine status="running">
-				<TraceIcon className="mr-1.5 size-3.5">
+				<TraceIcon className="mr-1.5 size-3.5 text-blue-600 dark:text-blue-400">
 					<LoaderCircle className="size-3.5 animate-spin" />
 				</TraceIcon>
 				<TraceTitle>{name}</TraceTitle>
@@ -40,11 +42,11 @@ function ToolTraceLine({ call }: { call: AgentToolCall }) {
 	if (call.state === "input-available") {
 		return (
 			<TraceLine status="running">
-				<TraceIcon className="mr-1.5 size-3.5">
+				<TraceIcon className="mr-1.5 size-3.5 text-blue-600 dark:text-blue-400">
 					<LoaderCircle className="size-3.5 animate-spin" />
 				</TraceIcon>
 				<TraceTitle>{name}</TraceTitle>
-				<TraceDescription className="ml-2">{args}</TraceDescription>
+				<TraceDescription className="ml-2">{args}</TraceDescription>{" "}
 			</TraceLine>
 		);
 	}
@@ -52,7 +54,7 @@ function ToolTraceLine({ call }: { call: AgentToolCall }) {
 	if (call.state === "output-error") {
 		return (
 			<TraceLine status="error">
-				<TraceIcon className="mr-1.5 size-3.5">
+				<TraceIcon className="mr-1.5 size-3.5 text-destructive">
 					<CircleAlert className="size-3.5" />
 				</TraceIcon>
 				<TraceTitle>{name}</TraceTitle>
@@ -63,7 +65,7 @@ function ToolTraceLine({ call }: { call: AgentToolCall }) {
 
 	return (
 		<TraceLine>
-			<TraceIcon className="mr-1.5 size-3.5">
+			<TraceIcon className="mr-1.5 size-3.5 text-emerald-600 dark:text-emerald-400">
 				<CircleCheck className="size-3.5" />
 			</TraceIcon>
 			<TraceTitle>{name}</TraceTitle>
@@ -78,11 +80,18 @@ export function ToolTrace({ toolCalls, collapsed = false }: ToolTraceProps) {
 	}
 
 	const lines = toolCalls.map((call) => (
-		<ToolTraceLine key={call.toolCallId} call={call} />
+		<motion.div
+			key={call.toolCallId}
+			initial={{ opacity: 0, y: 6 }}
+			animate={{ opacity: 1, y: 0 }}
+			transition={{ duration: 0.2 }}
+		>
+			<ToolTraceLine call={call} />
+		</motion.div>
 	));
 
 	if (!collapsed) {
-		return <Trace className="gap-1">{lines}</Trace>;
+		return <Trace className="gap-1 text-xs">{lines}</Trace>;
 	}
 
 	return (
@@ -94,7 +103,7 @@ export function ToolTrace({ toolCalls, collapsed = false }: ToolTraceProps) {
 				</TraceDescription>
 			</TraceCollapsibleTrigger>
 			<TraceCollapsibleContent className="text-xs">
-				<Trace className="gap-1">{lines}</Trace>
+				<Trace className="gap-1 text-xs">{lines}</Trace>
 			</TraceCollapsibleContent>
 		</TraceCollapsible>
 	);

@@ -10,7 +10,7 @@ function Trace({ className, ...props }: React.ComponentProps<"div">) {
 	return (
 		<div
 			data-slot="trace"
-			className={cn("flex w-full min-w-0 flex-col", className)}
+			className={cn("flex w-full min-w-0 flex-col space-y-1", className)}
 			{...props}
 		/>
 	);
@@ -130,7 +130,10 @@ function TraceCollapsibleContent({
 		>
 			<div
 				data-slot="trace-collapsible-content-inner"
-				className={cn("min-w-0 break-words text-muted-foreground", className)}
+				className={cn(
+					"min-w-0 wrap-break-word text-muted-foreground",
+					className,
+				)}
 			>
 				{children}
 			</div>
