@@ -1,3 +1,5 @@
+import type { UIMessage } from "ai";
+
 export type DiskEntryType = "file" | "directory";
 
 export interface HealthResponse {
@@ -75,18 +77,10 @@ export interface AgentAnalyzeRequest {
 	question?: string;
 }
 
-export interface AgentToolCall {
-	name: string;
-	args: Record<string, unknown>;
-	status: "ok" | "error";
-	result: unknown;
-}
-
-export interface AgentAnalyzeResponse {
-	summary: string;
-	tool_calls: AgentToolCall[];
-}
-
+export type AgentToolCall = Extract<
+	UIMessage["parts"][number],
+	{ type: `tool-${string}` }
+>;
 export interface CleanupExecuteRequest {
 	paths: string[];
 }

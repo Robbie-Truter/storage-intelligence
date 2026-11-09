@@ -142,11 +142,12 @@ async def stream_readonly_analysis(
 
             elif kind == "on_tool_end":
                 run_id = event.get("run_id", "")
+                output = event["data"].get("output") or {}
 
                 yield {
                     "type": "tool_result",
                     "id": run_id,
-                    "result": event["data"].get("output"),
+                    "result": output.content if isinstance(output, ToolMessage) else output,
                 }
 
             # --- Final graph output: collect all messages for the summary ---

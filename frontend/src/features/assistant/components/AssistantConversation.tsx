@@ -1,10 +1,11 @@
 import { Bot, UserRound } from "lucide-react";
-import type { AgentAnalyzeResponse } from "@/lib/api/types";
+import type { AgentToolCall } from "@/lib/api/types";
 import { ToolCallTimeline } from "./ToolCallTimeline";
 
 type HistoryItem = {
-	type: "agent" | "user";
-	message: AgentAnalyzeResponse | string | null;
+	role: "user" | "system" | "assistant";
+	message: string;
+	toolCalls?: AgentToolCall[];
 	timestamp: string | Date;
 };
 
@@ -19,8 +20,9 @@ function formatTimestamp(ts: string | Date) {
 }
 
 export function AssistantConversation({
-	type,
+	role,
 	message,
+	toolCalls,
 	timestamp,
 }: HistoryItem) {
 	if (!message) {
@@ -29,40 +31,22 @@ export function AssistantConversation({
 
 	const timeLabel = formatTimestamp(timestamp);
 
-	if (type === "user" && typeof message === "string") {
-		return (
-			<div className="relative space-y-4 rounded-lg border bg-card p-4 shadow-sm">
-				{timeLabel && (
-					<span className="absolute right-2 top-2 text-xs text-muted-foreground">
-						{timeLabel}
-					</span>
-				)}
-				<div className="space-y-2">
-					<UserRound />
-					<p className="whitespace-pre-wrap wrap-break-word text-sm leading-relaxed">
-						{message}
-					</p>
-				</div>
-			</div>
-		);
-	}
+	return (
+		<div className="relative space-y-4 rounded-lg border bg-card p-4 shadow-sm">
+			{timeLabel && (
+				<span className="absolute right-2 top-2 text-xs text-muted-foreground">
+					{timeLabel}
+				</span>
+			)}
+			<div className="space-y-2">
+				{role === "user" ? <UserRound /> : <Bot />}
 
-	if (type === "agent" && typeof message !== "string") {
-		return (
-			<div className="relative space-y-4 rounded-lg border bg-card p-4 shadow-sm">
-				{timeLabel && (
-					<span className="absolute right-2 top-2 text-xs text-muted-foreground">
-						{timeLabel}
-					</span>
-				)}
-				<div className="space-y-2">
-					<Bot />
-					<p className="whitespace-pre-wrap wrap-break-word text-sm leading-relaxed">
-						{message.summary}
-					</p>
-				</div>
-				<ToolCallTimeline toolCalls={message.tool_calls ?? []} />
+				<p className="whitespace-pre-wrap wrap-break-word text-sm leading-relaxed">
+					{message}
+				</p>
 			</div>
-		);
-	}
+
+			{role === "assistant" && <ToolCallTimeline toolCalls={toolCalls ?? []} />}
+		</div>
+	);
 }

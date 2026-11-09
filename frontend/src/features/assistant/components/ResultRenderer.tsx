@@ -9,6 +9,36 @@ function isObject(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function normalizeResult(result: unknown): unknown {
+	if (Array.isArray(result)) {
+		const textBlocks = result.filter(
+			(item) =>
+				isObject(item) && item.type === "text" && typeof item.text === "string",
+		);
+
+		if (textBlocks.length > 0) {
+			const text = textBlocks.map((item) => item.text as string).join("\n");
+
+			try {
+				return JSON.parse(text);
+			} catch {
+				return text;
+			}
+		}
+	}
+
+	// Also handle a JSON string returned directly.
+	if (typeof result === "string") {
+		try {
+			return JSON.parse(result);
+		} catch {
+			return result;
+		}
+	}
+
+	return result;
+}
+
 function renderPreviewTrash(result: unknown) {
 	if (!isObject(result)) {
 		return null;
@@ -259,68 +289,82 @@ function renderObject(result: unknown) {
 }
 
 export function ResultRenderer({ toolName, result }: ResultRendererProps) {
+	const normalizedResult = normalizeResult(result);
+
 	if (toolName === "preview_trash") {
-		const rendered = renderPreviewTrash(result);
-		if (rendered) {
-			return rendered;
-		}
+		return (
+			renderPreviewTrash(normalizedResult) ?? (
+				<Fallback result={normalizedResult} />
+			)
+		);
 	}
+
 	if (toolName === "directory_disk_usage") {
-		const rendered = renderDirectoryUsage(result);
-		if (rendered) {
-			return rendered;
-		}
+		return (
+			renderDirectoryUsage(normalizedResult) ?? (
+				<Fallback result={normalizedResult} />
+			)
+		);
 	}
+
 	if (toolName === "disk_usage") {
-		const rendered = renderDiskUsage(result);
-		if (rendered) {
-			return rendered;
-		}
+		return (
+			renderDiskUsage(normalizedResult) ?? (
+				<Fallback result={normalizedResult} />
+			)
+		);
 	}
+
 	if (toolName === "explore_directory") {
-		const rendered = renderExploreDirectory(result);
-		if (rendered) {
-			return rendered;
-		}
+		return (
+			renderExploreDirectory(normalizedResult) ?? (
+				<Fallback result={normalizedResult} />
+			)
+		);
 	}
+
 	if (toolName === "count_files") {
-		const rendered = renderCountFiles(result);
-		if (rendered) {
-			return rendered;
-		}
+		return (
+			renderCountFiles(normalizedResult) ?? (
+				<Fallback result={normalizedResult} />
+			)
+		);
 	}
+
 	if (toolName === "file_info") {
-		const rendered = renderFileInfo(result);
-		if (rendered) {
-			return rendered;
-		}
+		return (
+			renderFileInfo(normalizedResult) ?? <Fallback result={normalizedResult} />
+		);
 	}
+
 	if (
 		toolName === "find_large_files" ||
 		toolName === "find_duplicate_files" ||
 		toolName === "find_stale_files"
 	) {
-		const rendered = renderArray(result);
-		if (rendered) {
-			return rendered;
-		}
+		return (
+			renderArray(normalizedResult) ?? <Fallback result={normalizedResult} />
+		);
 	}
+
 	if (toolName === "find_empty_directories" || toolName === "find_junk_files") {
-		const rendered = renderObject(result);
-		if (rendered) {
-			return rendered;
-		}
+		return (
+			renderObject(normalizedResult) ?? <Fallback result={normalizedResult} />
+		);
 	}
-	if (Array.isArray(result)) {
-		return renderArray(result);
-	}
-	if (isObject(result)) {
-		return renderObject(result);
-	}
+
+	return <Fallback result={normalizedResult} />;
+}
+
+function Fallback({ result }: { result: unknown }) {
+	if (Array.isArray(result)) return renderArray(result);
+	if (isObject(result)) return renderObject(result);
+
 	if (typeof result === "string") {
 		return (
 			<p className="text-sm whitespace-pre-wrap wrap-break-word">{result}</p>
 		);
 	}
+
 	return <p className="text-sm text-muted-foreground">No result</p>;
 }

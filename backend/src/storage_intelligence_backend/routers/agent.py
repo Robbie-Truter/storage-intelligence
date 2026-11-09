@@ -21,6 +21,7 @@ when the run fails after the stream has opened.
 """
 
 import json
+import uuid
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -142,15 +143,20 @@ async def analyze(
         raise AgentModelError(detail, status_code=503) from exc
 
     async def _event_generator() -> AsyncIterator[str]:
-        yield _sse_frame({"type": "start", "messageId": "assistant-1"})
-        yield _sse_frame({"type": "text-start", "id": "text-1"})
+        message_id = str(uuid.uuid4())
+        text_id = str(uuid.uuid4())
+
+        yield _sse_frame({"type": "start", "messageId": message_id})
+        yield _sse_frame({"type": "text-start", "id": text_id})
+
         try:
             async for event in stream_readonly_analysis(agent, request.path, request.question):
-                ui_event = _to_ui_events(event)
+                print("AGENT EVENT:", event["type"])
+                ui_event = _to_ui_events(event, text_id)
                 if ui_event:
                     yield _sse_frame(ui_event)
 
-            yield _sse_frame({"type": "text-end", "id": "text-1"})
+            yield _sse_frame({"type": "text-end", "id": text_id})
             yield _sse_frame({"type": "finish"})
             yield "data: [DONE]\n\n"
         except GraphRecursionError:
@@ -176,11 +182,11 @@ async def analyze(
     )
 
 
-def _to_ui_events(event: dict[str, Any]) -> dict[str, Any] | None:
+def _to_ui_events(event: dict[str, Any], id: str) -> dict[str, Any] | None:
     if event["type"] == "text_delta":
         return {
             "type": "text-delta",
-            "id": "text-1",
+            "id": id,
             "delta": event["content"],
         }
 
@@ -190,6 +196,13 @@ def _to_ui_events(event: dict[str, Any]) -> dict[str, Any] | None:
             "toolCallId": event["id"],
             "toolName": event["name"],
             "input": event["args"],
+        }
+
+    if event["type"] == "tool_result":
+        return {
+            "type": "tool-output-available",
+            "toolCallId": event["id"],
+            "output": event["result"],
         }
 
 
