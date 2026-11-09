@@ -5,9 +5,9 @@ import { MessagesSquare } from "lucide-react";
 import { useLayoutEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useAnalyze } from "@/features/assistant";
 import { AssistantConversation } from "@/features/assistant/components/AssistantConversation";
 import { Composer } from "@/features/assistant/components/Composer";
+import { ToolTrace } from "@/features/assistant/components/ToolTrace";
 import { useAnalyzeRequest } from "@/features/assistant/hooks/useAnalyzeRequest";
 import type { AgentToolCall } from "@/lib/api/types";
 
@@ -17,7 +17,6 @@ export function AssistantPage() {
 
 	const conversationRef = useRef<HTMLDivElement>(null);
 
-	const analyzeMutation = useAnalyze();
 	const { modelId, selectedModel, apiKey, hasKey } = useAnalyzeRequest();
 
 	const { messages, sendMessage, status, error } = useChat({
@@ -46,6 +45,25 @@ export function AssistantPage() {
 				(part.state === "output-available" || part.state === "output-error"),
 		);
 
+	const getLiveToolCalls = (message: UIMessage) =>
+		message.parts.filter(
+			(part): part is AgentToolCall =>
+				part.type.startsWith("tool-") &&
+				"state" in part &&
+				(part.state === "input-streaming" || part.state === "input-available"),
+		);
+
+	const getTraceToolCalls = (message: UIMessage) =>
+		message.parts.filter(
+			(part): part is AgentToolCall =>
+				part.type.startsWith("tool-") &&
+				"state" in part &&
+				(part.state === "input-streaming" ||
+					part.state === "input-available" ||
+					part.state === "output-available" ||
+					part.state === "output-error"),
+		);
+
 	const messageHistory = messages.map((message) => {
 		return {
 			id: message.id,
@@ -54,6 +72,21 @@ export function AssistantPage() {
 			toolCalls: getMessageToolCalls(message),
 		};
 	});
+
+	const lastMessage = messages.at(-1);
+
+	const lastAssistantMessage =
+		lastMessage?.role === "assistant" ? lastMessage : undefined;
+
+	const liveToolCalls =
+		isLoading && lastAssistantMessage
+			? getLiveToolCalls(lastAssistantMessage)
+			: [];
+
+	const traceToolCalls =
+		!isLoading && lastAssistantMessage
+			? getTraceToolCalls(lastAssistantMessage)
+			: [];
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: Only scroll when the message count changes.
 	useLayoutEffect(() => {
@@ -156,7 +189,7 @@ export function AssistantPage() {
 							initial={{ opacity: 0, y: 12 }}
 							animate={{ opacity: 1, y: 0 }}
 							exit={{ opacity: 0, y: -12 }}
-							className="flex items-center justify-start pl-1"
+							className="flex flex-col items-start gap-1 pl-1"
 						>
 							<div className="flex items-center gap-1.5 rounded-lg px-2 py-2">
 								<motion.span
@@ -205,9 +238,20 @@ export function AssistantPage() {
 									•
 								</motion.span>
 							</div>
+							<ToolTrace toolCalls={liveToolCalls} />
 						</motion.div>
 					) : null}
 				</AnimatePresence>
+
+				{!isLoading && traceToolCalls.length > 0 && (
+					<motion.div
+						initial={{ opacity: 0, y: 12 }}
+						animate={{ opacity: 1, y: 0 }}
+						className="pl-1"
+					>
+						<ToolTrace toolCalls={traceToolCalls} collapsed />
+					</motion.div>
+				)}
 			</div>
 
 			<div>
@@ -219,7 +263,7 @@ export function AssistantPage() {
 					selectedModel={selectedModel}
 					hasKey={hasKey}
 					canSend={canSend}
-					isSending={analyzeMutation.isPending}
+					isSending={isLoading}
 					onSend={handleSend}
 				/>
 			</div>

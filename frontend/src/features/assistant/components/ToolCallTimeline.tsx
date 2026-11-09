@@ -12,7 +12,7 @@ interface ToolCallTimelineProps {
 	toolCalls: AgentToolCall[];
 }
 
-function summarizeArgs(args: unknown): string {
+export function summarizeArgs(args: unknown): string {
 	if (!args || typeof args !== "object" || Array.isArray(args)) {
 		return "No arguments";
 	}
