@@ -36,4 +36,5 @@ export const queryKeys = {
 	diskCount: (path?: string) => ["disk", "count", path ?? null] as const,
 	diskInfo: (path?: string) => ["disk", "info", path ?? null] as const,
 	agentModels: ["agent", "models"] as const,
+	apiKeyStatus: ["settings", "api-keys"] as const,
 };

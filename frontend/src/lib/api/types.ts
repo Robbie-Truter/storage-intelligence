@@ -68,6 +68,15 @@ export interface AgentModelOption {
 	mode: "cloud" | "local" | string;
 }
 
+export interface ApiKeyStatus {
+	openai: boolean;
+	google: boolean;
+}
+
+export type CredentialProvider = keyof ApiKeyStatus;
+
+export type ApiKeysUpdateRequest = Partial<Record<CredentialProvider, string>>;
+
 export interface AgentAnalyzeRequest {
 	provider: string;
 	model_name: string;

@@ -107,9 +107,9 @@ and a readiness-aware shell. No Home/Assistant product UI yet.
 - [x] Implement `ThemeProvider`: `light` / `dark` / `system`, persisted under a
       single non-secret key, applied via the `dark` class, reacting to system
       changes.
-- [x] Implement `SettingsProvider`: selected model id and per-provider API keys
-      in React state; `setApiKey` / `clearApiKey` / `setModelId`. Never persist
-      keys. Keep the model id in memory for v1 (simplest safe default).
+- [x] Implement `SettingsProvider`: selected model id and custom models in React
+      state; `setModelId` / `addCustomModel`. Provider keys are not held in
+      context. Keep the model id in memory for v1 (simplest safe default).
 - [x] Build `AppShell` with a sidebar and content outlet, plus `PageHeader`
       (title, description, actions). Keep the shell simple; collapse and mobile
       overlay are Phase 6.
@@ -182,8 +182,8 @@ endpoint usage and per-section states. Reference handoff §8.1.
 
 ## Phase 3 — Settings
 
-Goal: theme, model selection, and in-memory keys with explicit privacy copy.
-Reference handoff §8.3.
+Goal: theme, model selection, and OS credential-store key management with
+explicit privacy copy. Reference handoff §8.3.
 
 - [x] Add `useModels` for `GET /api/agent/models` with `staleTime: Infinity`,
       `gcTime: 1h`, and no polling.
@@ -192,13 +192,16 @@ Reference handoff §8.3.
       without hardcoding ids.
 - [x] Derive the provider list from the fetched models; render a password field
       for every provider except `ollama`, each with reveal and clear controls.
-- [ ] Wire fields to `SettingsProvider`; confirm no key value is written to any
-      storage, URL, or log.
+- [x] Manage key drafts locally in `ProviderKeyFields`; load presence with
+      `GET /api/settings/api-keys` and save changes with
+      `PUT /api/settings/api-keys`. Confirm no key value is written to React
+      context, storage, URL, or log.
 - [ ] Add the theme selector (light/dark/system) bound to `ThemeProvider`.
 - [ ] Display readiness and the resolved API base URL.
 - [ ] Add the privacy notice: cloud providers receive tool results (paths,
-      names, sizes); Ollama keeps analysis local; keys are lost on reload; the
-      backend stores nothing; preferences are local-only.
+      names, sizes); Ollama keeps analysis local; keys are stored in the OS
+      credential store, never returned by the backend, and only presence is
+      shown; preferences are local-only.
 - [ ] Show that Ollama models need no key.
 
 ### Acceptance criteria
@@ -217,8 +220,8 @@ Goal: one-shot analysis with a readable summary and a complete tool-call
 timeline. Reference handoff §8.2 and §4.5.
 
 - [ ] Add `useAnalyze` using `agentApi` and `POST /api/agent/analyze`. Build the
-      body with `model`, trimmed `question`/`path` only when non-empty, and
-      `api_key` only when it is non-empty and the provider is not `ollama`.
+      body with `model` and trimmed `question`/`path` only when non-empty; the
+      backend resolves provider keys from its OS credential store.
 - [ ] Build the composer: path, question, model indicator, and key-readiness
       indicator. Require a model; allow blank question/path (backend defaults).
 - [ ] Send flow: disable duplicate sends, show honest progress copy ("Analyzing…

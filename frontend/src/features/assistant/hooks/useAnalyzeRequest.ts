@@ -1,10 +1,13 @@
 import { useMemo } from "react";
+import { credentialProviderFor } from "@/features/settings/providerKeys";
+import { useApiKeyStatus } from "@/features/settings/useApiKeyStatus";
 import { useModels } from "@/features/settings/useModels";
 import { useSettings } from "@/providers/SettingsProvider";
 
 export function useAnalyzeRequest() {
-	const { modelId, apiKeys, customModels } = useSettings();
+	const { modelId, customModels } = useSettings();
 	const { data: models = [] } = useModels();
+	const { data: keyStatus } = useApiKeyStatus();
 
 	const allModels = useMemo(
 		() => [...models, ...customModels],
@@ -16,32 +19,20 @@ export function useAnalyzeRequest() {
 		[allModels, modelId],
 	);
 
-	const apiKey = useMemo(() => {
-		if (!selectedModel) {
-			return undefined;
-		}
-		if (selectedModel.provider === "ollama") {
-			return undefined;
-		}
-		const key = apiKeys[selectedModel.provider];
-		const trimmed = key?.trim();
-		return trimmed && trimmed.length > 0 ? trimmed : undefined;
-	}, [apiKeys, selectedModel]);
-
 	const hasKey = useMemo(() => {
 		if (!selectedModel) {
 			return false;
 		}
-		if (selectedModel.provider === "ollama") {
+		if (selectedModel.provider.toLowerCase() === "ollama") {
 			return true;
 		}
-		return apiKey !== undefined;
-	}, [apiKey, selectedModel]);
+		const credential = credentialProviderFor(selectedModel.provider);
+		return credential !== null && Boolean(keyStatus?.[credential]);
+	}, [keyStatus, selectedModel]);
 
 	return {
 		modelId,
 		selectedModel,
-		apiKey,
 		hasKey,
 	};
 }

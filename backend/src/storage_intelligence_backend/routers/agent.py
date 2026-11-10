@@ -36,12 +36,35 @@ from ..agents.models import (
 )
 from ..agents.storage_agent import build_agent, stream_readonly_analysis
 from ..config import get_settings
+from ..credentials.api_keys import PROVIDERS, CredentialStoreError, get_api_key
 from ..deps import get_mcp_manager
 from ..mcp.errors import MCPUnavailable
 from ..mcp.manager import StorageMCPClient
 from ..schemas import AgentAnalyzeRequest, AgentModelOption
 
 router = APIRouter(prefix="/agent", tags=["agent"])
+
+_CREDENTIAL_PROVIDER_ALIASES = {"google_genai": "google"}
+
+
+def stored_api_key(provider: str) -> str | None:
+    """Return the key saved in the OS credential store for ``provider``.
+
+    LangChain provider ids do not always match the credential-store names;
+    ``google_genai`` uses the ``google`` entry. Providers without an entry are
+    reported as unset.
+    """
+    credential_provider = _CREDENTIAL_PROVIDER_ALIASES.get(provider, provider)
+    if credential_provider not in PROVIDERS:
+        return None
+
+    try:
+        return get_api_key(credential_provider)
+    except CredentialStoreError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="The operating system credential store is unavailable.",
+        ) from exc
 
 
 @router.get("/models", response_model=list[AgentModelOption])
@@ -72,8 +95,9 @@ async def analyze(
     """Analyze the storage usage under ``path`` and stream the run as SSE.
 
     ``provider`` and ``model_name`` identify the model to build; the provider
-    must be one of the installed integrations. ``api_key`` is the client-supplied
-    key for that provider (required for cloud models, unused for Ollama).
+    must be one of the installed integrations. ``api_key`` is optional for cloud
+    models: when omitted, the key saved in the OS credential store is used. It
+    is unused for Ollama.
     ``path`` is optional - without it the agent starts from the default
     location, which is where the MCP tools fall back to. ``question`` is
     optional too: without one the agent looks for what takes the most space.
@@ -88,10 +112,11 @@ async def analyze(
 
     Status codes:
         200: the stream opened; inspect the ``event``/``type`` of each frame.
-        422: ``provider`` is unsupported, ``model_name`` is empty, or ``api_key``
-            is missing for a cloud provider.
-        503: the MCP server is unavailable, or the chat model could not be
-            constructed (for example, its provider integration failed to load).
+        422: ``provider`` is unsupported, ``model_name`` is empty, or no API key
+            is available for a cloud provider.
+        503: the MCP server is unavailable, the OS credential store cannot be
+            read, or the chat model could not be constructed (for example, its
+            provider integration failed to load).
     """
     settings = get_settings()
 
@@ -120,9 +145,15 @@ async def analyze(
     api_key = request.api_key.get_secret_value() if request.api_key else None
 
     if provider != "ollama" and not api_key:
+        api_key = stored_api_key(provider)
+
+    if provider != "ollama" and not api_key:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=f"api_key is required for the {provider} provider.",
+            detail=(
+                f"No API key is available for the {provider} provider. "
+                "Save one in Settings or send api_key with the request."
+            ),
         )
 
     try:

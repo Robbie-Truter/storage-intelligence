@@ -17,7 +17,7 @@ export function AssistantPage() {
 
 	const conversationRef = useRef<HTMLDivElement>(null);
 
-	const { modelId, selectedModel, apiKey, hasKey } = useAnalyzeRequest();
+	const { modelId, selectedModel, hasKey } = useAnalyzeRequest();
 
 	const { messages, sendMessage, status, error } = useChat({
 		transport: new DefaultChatTransport({
@@ -105,7 +105,6 @@ export function AssistantPage() {
 			model_name: selectedModel?.model_name ?? "",
 			...(trimmedPath ? { path: trimmedPath } : {}),
 			...(trimmedQuestion ? { question: trimmedQuestion } : {}),
-			...(apiKey ? { api_key: apiKey } : {}),
 		};
 
 		await sendMessage(

@@ -11,24 +11,21 @@ import type { AgentModelOption } from "@/lib/api/types";
 interface SettingsContextValue {
 	modelId: string | null;
 	customModels: AgentModelOption[];
-	apiKeys: Record<string, string>;
 	setModelId: (modelId: string | null) => void;
 	addCustomModel: (provider: string, modelName: string) => void;
-	setApiKey: (provider: string, key: string) => void;
-	clearApiKey: (provider: string) => void;
 }
 
 const SettingsContext = createContext<SettingsContextValue | null>(null);
 
 /**
- * Holds the selected model and provider keys in React memory only.
+ * Holds the selected model and custom models in React state.
  *
- * Keys are never written to storage, URLs, logs, or error messages.
+ * Provider API keys are not stored here: the backend's OS credential store is
+ * the source of truth, and the settings page manages keys locally.
  */
 export function SettingsProvider({ children }: { children: ReactNode }) {
 	const [modelId, setModelId] = useState<string | null>(null);
 	const [customModels, setCustomModels] = useState<AgentModelOption[]>([]);
-	const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
 
 	const addCustomModel = useCallback(
 		(provider: string, modelName: string) => {
@@ -61,43 +58,14 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 		[customModels],
 	);
 
-	const setApiKey = useCallback((provider: string, key: string) => {
-		const trimmedKey = key.trim();
-		setApiKeys((current) => {
-			if (trimmedKey === "") {
-				if (!(provider in current)) {
-					return current;
-				}
-				const next = { ...current };
-				delete next[provider];
-				return next;
-			}
-			return { ...current, [provider]: trimmedKey };
-		});
-	}, []);
-
-	const clearApiKey = useCallback((provider: string) => {
-		setApiKeys((current) => {
-			if (!(provider in current)) {
-				return current;
-			}
-			const next = { ...current };
-			delete next[provider];
-			return next;
-		});
-	}, []);
-
 	const value = useMemo(
 		() => ({
 			modelId,
 			customModels,
-			apiKeys,
 			setModelId,
 			addCustomModel,
-			setApiKey,
-			clearApiKey,
 		}),
-		[modelId, customModels, apiKeys, addCustomModel, setApiKey, clearApiKey],
+		[modelId, customModels, addCustomModel],
 	);
 
 	return (

@@ -14,7 +14,7 @@ export function SettingsPage() {
 		<div className="space-y-6">
 			<PageHeader
 				title="Settings"
-				description="Choose a theme and configure the model and provider keys."
+				description="Choose a theme, select a model, and manage provider keys."
 			/>
 
 			<div className="grid gap-6 max-w-2xl">
@@ -38,8 +38,8 @@ export function SettingsPage() {
 							Provider Keys
 						</CardTitle>
 						<CardDescription>
-							Configure API keys for cloud providers. Keys are held in React
-							memory only.
+							Configure API keys for cloud providers. Keys are stored securely
+							in your operating system's credential store.
 						</CardDescription>
 					</CardHeader>
 					<CardContent>

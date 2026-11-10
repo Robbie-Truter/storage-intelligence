@@ -1,6 +1,5 @@
 import { motion } from "framer-motion";
 import { CircleAlert, CircleCheck, LoaderCircle } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import {
 	Trace,
 	TraceCollapsible,
