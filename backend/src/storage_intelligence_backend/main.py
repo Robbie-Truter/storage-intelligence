@@ -21,6 +21,7 @@ from .config import get_settings
 from .mcp.errors import MCPToolError, MCPUnavailable
 from .mcp.manager import StorageMCPClient
 from .routers import agent, cleanup, disk, health
+from .routers import settings as settings_router
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +89,7 @@ def create_app() -> FastAPI:
     app.include_router(disk.router, prefix="/api")
     app.include_router(agent.router, prefix="/api")
     app.include_router(cleanup.router, prefix="/api")
+    app.include_router(settings_router.router, prefix="/api")
 
     return app
 

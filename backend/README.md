@@ -4,10 +4,12 @@ A FastAPI service that talks to the Storage Intelligence **MCP server** over MCP
 and exposes an HTTP API for the frontend, plus an optional read-only LLM
 analysis agent.
 
-The client supplies the provider API key with each analysis request; the
-backend never stores it. The service runs locally: it launches the MCP server
-as a child process over stdio and shares that one connection between the
-deterministic REST routes and the agent.
+The client may supply the provider API key with each analysis request, or store
+it locally in the operating system's credential store through the settings
+routes; the backend never writes keys to SQLite, JSON, or `.env` files. The
+service runs locally: it launches the MCP server as a child process over stdio
+and shares that one connection between the deterministic REST routes and the
+agent.
 
 This is the `backend/` package of the Storage Intelligence monorepo. The
 project overview lives in the [root README](../README.md); the server this
@@ -24,6 +26,7 @@ service calls lives in [`mcp-server/`](../mcp-server/README.md).
   - [Disk](#disk)
   - [Agent](#agent)
   - [Cleanup](#cleanup)
+- [Settings](#settings)
 - [The read-only agent](#the-read-only-agent)
 - [Cleanup safety model](#cleanup-safety-model)
 - [Error mapping](#error-mapping)
@@ -45,7 +48,8 @@ service calls lives in [`mcp-server/`](../mcp-server/README.md).
 ┌──────────────────────────────────────────────────────────────────┐
 │              Backend — FastAPI + LangChain                       │
 │                                                                  │
-│  routers/    health · disk · agent · cleanup                     │
+│  routers/    health · disk · agent · cleanup · settings           │
+│  credentials/ provider API keys in the OS credential store       │
 │  mcp/        StorageMCPClient: stdio subprocess + MCPAdapter      │
 │  agents/     read-only analysis agent                            │
 └───────────────────────────────┬──────────────────────────────────┘
@@ -89,11 +93,14 @@ backend/
 │   │   └── storage_agent.py  # build_agent(...) + stream_readonly_analysis(...)
 │   ├── cleanup/
 │   │   └── preview_store.py  # unused scaffolding; v1 has no preview store
+│   ├── credentials/
+│   │   └── api_keys.py      # provider keys in the OS credential store
 │   └── routers/
 │       ├── health.py         # liveness + readiness
 │       ├── disk.py           # deterministic; no LLM
 │       ├── agent.py          # LLM-driven; read-only tools
-│       └── cleanup.py        # execute: submits paths to MCP trash_path
+│       ├── cleanup.py        # execute: submits paths to MCP trash_path
+│       └── settings.py       # local provider API key management
 ├── postman/                  # Postman collection, environment, workspace globals
 └── tests/
 ```
@@ -116,6 +123,8 @@ Interactive API docs are served at `http://127.0.0.1:8000/docs`.
 | `GET /api/agent/models` | — | The selectable models; no MCP or provider key needed |
 | `POST /api/agent/analyze` | read-only agent | `{model, path?, question?}` → SSE stream (`tool_call`, `text_delta`, `complete`, `error`) |
 | `POST /api/cleanup/execute` | `trash_path(confirm=True)` | `{paths: [...]}` — the only mutating route |
+| `GET /api/settings/api-keys` | — | Whether `openai` / `google` keys are configured; never returns keys |
+| `PUT /api/settings/api-keys` | — | `{openai?, google?}`: set/replace a key, empty string clears, omitted leaves unchanged |
 
 `path` is optional on the disk routes: when it is omitted the request is
 forwarded without a `path` argument, so the MCP tool applies its own default
@@ -230,6 +239,33 @@ The request body is exactly `{"paths": [...]}` with at least one path. Extra
 keys are rejected (`extra="forbid"`), so a client cannot smuggle a `confirm`
 flag in.
 
+### Settings
+
+Provider API keys are stored in the operating system's credential store via
+[`keyring`](https://pypi.org/project/keyring/), under the service name
+`storage-intelligence` and the provider names `openai` and `google`. They are
+never written to SQLite, JSON, or `.env` files.
+
+```jsonc
+// GET /api/settings/api-keys
+{ "openai": true, "google": false }
+
+// PUT /api/settings/api-keys — store or replace one or both keys
+{ "openai": "sk-...", "google": "AIza..." }
+
+// PUT /api/settings/api-keys — clear the OpenAI key, leave Google unchanged
+{ "openai": "" }
+
+// 200 — the same presence payload as GET; a key is never returned
+{ "openai": false, "google": true }
+```
+
+A non-empty value stores or replaces that provider's key, an empty (or
+whitespace-only) string clears it, and an omitted field leaves the existing key
+unchanged. A body with neither `openai` nor `google` is a 422. If the OS
+credential store cannot be read or written, the route returns 503. Submitted
+keys are not logged or echoed.
+
 ---
 
 ## The read-only agent
@@ -314,10 +350,10 @@ started from the `backend/` directory.
 | `STORAGE_BACKEND_AGENT_MAX_ITERATIONS` | `10` | Agent step limit (LangGraph `recursion_limit`) |
 | `STORAGE_BACKEND_CORS_ORIGINS` | `[]` | JSON array of allowed origins, e.g. `["http://localhost:5173"]` |
 
-Provider API keys are **not** modelled in `Settings`: the client supplies the
-selected provider's key as `api_key` in the `/api/agent/analyze` request body.
-The backend passes it to the model for that request only and never stores or
-returns it. Ollama runs locally and needs no key.
+Provider API keys are **not** modelled in `Settings`: the client may supply the
+selected provider's key as `api_key` in the `/api/agent/analyze` request body,
+or store it locally through `/api/settings/api-keys`. In both cases the backend
+never returns the key. Ollama runs locally and needs no key.
 
 On startup the lifespan opens the MCP connection. If it fails, the app starts
 in **degraded mode** (readiness reports it) unless `STORAGE_BACKEND_MCP_REQUIRED`
@@ -369,11 +405,11 @@ uv run pytest
 uv build
 ```
 
-62 tests cover the health routes, the disk routes, the agent endpoints (model
+The suite covers the health routes, the disk routes, the agent endpoints (model
 catalogue and analysis), the client-supplied key handling and tool boundary,
-the storage agent, and the cleanup execution path. The suite
-runs with `asyncio_mode = "auto"` and carries an `integration` marker for
-tests that spawn the real MCP server over stdio.
+the storage agent, the settings routes and OS credential-store handling, and
+the cleanup execution path. It runs with `asyncio_mode = "auto"` and carries an
+`integration` marker for tests that spawn the real MCP server over stdio.
 
 The same checks run in CI for this package (see
 [`../.github/workflows/ci.yml`](../.github/workflows/ci.yml)).

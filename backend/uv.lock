@@ -2069,6 +2069,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
+    { name = "keyring" },
     { name = "langchain", extra = ["mcp"] },
     { name = "langchain-google-genai" },
     { name = "langchain-ollama" },
@@ -2090,6 +2091,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.143.0" },
+    { name = "keyring", specifier = ">=25.7.0" },
     { name = "langchain", extras = ["mcp"], specifier = ">=1.4.0" },
     { name = "langchain-google-genai", specifier = ">=4.0.0" },
     { name = "langchain-ollama", specifier = ">=1.0.0" },

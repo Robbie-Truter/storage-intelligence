@@ -6,7 +6,7 @@ count, info), the agent payloads, and the cleanup payloads are defined here.
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, SecretStr
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 
 
 class HealthResponse(BaseModel):
@@ -158,6 +158,37 @@ class AgentAnalyzeResponse(BaseModel):
 
     summary: str
     tool_calls: list[AgentToolCall]
+
+
+class ApiKeyStatusResponse(BaseModel):
+    """Which providers have an API key stored in the OS credential store.
+
+    Only the presence of a key is reported; the key itself is never returned.
+    """
+
+    openai: bool
+    google: bool
+
+
+class ApiKeysUpdateRequest(BaseModel):
+    """Request body of ``PUT /api/settings/api-keys``.
+
+    ``openai`` and ``google`` are optional and independent. A non-empty value
+    stores or replaces that provider's key, an empty string clears it, and an
+    omitted field leaves it unchanged. At least one of the two fields must be
+    present. ``SecretStr`` keeps the value out of reprs and logs.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    openai: SecretStr | None = None
+    google: SecretStr | None = None
+
+    @model_validator(mode="after")
+    def _require_a_provider(self) -> "ApiKeysUpdateRequest":
+        if not (self.model_fields_set & {"openai", "google"}):
+            raise ValueError("Provide at least one of 'openai' or 'google'.")
+        return self
 
 
 class CleanupExecuteRequest(BaseModel):

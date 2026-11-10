@@ -39,7 +39,7 @@ scaffolded yet:
 ┌──────────────────────────────────────────────────────────────────┐
 │        Backend — FastAPI + LangChain  (backend/)                 │
 │                                                                  │
-│   routers/     health · disk · agent · cleanup                   │
+│   routers/     health · disk · agent · cleanup · settings         │
 │   mcp/         StorageMCPClient: one stdio subprocess + adapter  │
 │   agents/      read-only analysis agent (LangChain)              │
 └───────────────────────────────┬──────────────────────────────────┘
@@ -87,7 +87,8 @@ storage-intelligence/
 │   │   ├── mcp/           # manager.py (client + adapter + allowlist), errors.py
 │   │   ├── agents/        # storage_agent.py (build_agent, run_readonly_analysis)
 │   │   ├── cleanup/       # preview_store.py (unused scaffolding in v1)
-│   │   └── routers/       # health.py · disk.py · agent.py · cleanup.py
+│   │   ├── credentials/   # provider keys in the OS credential store
+│   │   └── routers/       # health.py · disk.py · agent.py · cleanup.py · settings.py
 │   ├── postman/           # Postman collection, environment, and specs
 │   └── tests/
 ├── frontend/              # React + Vite dashboard (planned; not scaffolded yet)
@@ -162,8 +163,10 @@ uv run storage-intelligence      # stdio transport
 ## Backend (`backend/`)
 
 FastAPI service that speaks MCP to the server above and exposes HTTP for the
-frontend. The client supplies the provider API key with each agent request; the
-backend uses it for that request and never stores it.
+frontend. The client may supply the provider API key with each agent request
+(used for that request only), or store it locally in the operating system's
+credential store through the settings routes; keys are never written to SQLite,
+JSON, or `.env` files.
 
 ### Endpoints
 
@@ -178,6 +181,8 @@ backend uses it for that request and never stores it.
 | `GET /api/disk/info` | `file_info` | `path` |
 | `POST /api/agent/analyze` | read-only agent | `{model, api_key?, path?, question?}` → `{summary, tool_calls}` |
 | `POST /api/cleanup/execute` | `trash_path(confirm=True)` | `{paths: [...]}` — the only mutating route |
+| `GET /api/settings/api-keys` | — | Whether `openai` / `google` keys are configured; never returns keys |
+| `PUT /api/settings/api-keys` | — | `{openai?, google?}`: set/replace a key, empty string clears, omitted leaves unchanged |
 
 Interactive API docs are served at `http://127.0.0.1:8000/docs`.
 
