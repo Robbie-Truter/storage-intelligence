@@ -131,7 +131,7 @@ class AgentAnalyzeRequest(BaseModel):
     model: str | None = None
     api_key: SecretStr | None = None
     path: str | None = None
-    question: str | None = None
+    messages: list[dict[str, Any]]
 
 
 class AgentToolCall(BaseModel):

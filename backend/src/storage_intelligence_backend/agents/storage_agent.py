@@ -12,7 +12,7 @@ from typing import Any
 
 from langchain.agents import create_agent
 from langchain.chat_models import init_chat_model
-from langchain_core.messages import AIMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.errors import GraphRecursionError
 
 from storage_intelligence_backend.agents.errors import AgentModelError, format_model_error
@@ -88,7 +88,7 @@ def build_agent(
 async def stream_readonly_analysis(
     agent: Any,
     path: str | None = None,
-    question: str | None = None,
+    messages: list[dict[str, Any]] | None = None,
 ) -> AsyncIterator[dict[str, Any]]:
     """Stream agent events for ``path`` as dicts ready for SSE framing.
 
@@ -106,7 +106,19 @@ async def stream_readonly_analysis(
         AgentModelError: The AI model or provider failed or is overloaded.
         GraphRecursionError: The agent exceeded its step limit.
     """
-    prompt = _build_prompt(path, question)
+
+    conversation = _convert_messages(messages or [])
+
+    # Format the latest user message with the existing prompt builder.
+    if conversation and isinstance(conversation[-1], HumanMessage):
+        latest_message = conversation[-1]
+        latest_message.content = _build_prompt(
+            path=path,
+            question=_content_text(latest_message.content),
+        )
+
+    elif not conversation:
+        conversation = [HumanMessage(content=_build_prompt(path=path))]
 
     # astream_events is an async generator - do NOT await it.
     seen_tool_ids: set[str] = set()
@@ -114,7 +126,7 @@ async def stream_readonly_analysis(
 
     try:
         async for event in agent.astream_events(
-            {"messages": [{"role": "user", "content": prompt}]},
+            {"messages": conversation},
             version="v2",
         ):
             kind: str = event["event"]
@@ -256,3 +268,29 @@ def _content_text(content: Any) -> str:
         ]
         return "\n".join(part for part in parts if part)
     return str(content)
+
+
+def _convert_messages(messages: list[dict[str, Any]]) -> list[Any]:
+    """Convert Vercel AI SDK UIMessage objects into LangChain messages."""
+    converted: list[Any] = []
+
+    for message in messages:
+        role = message.get("role")
+        parts = message.get("parts", [])
+
+        # Extract text parts only for now.
+        content = "\n".join(
+            part["text"] for part in parts if part.get("type") == "text" and part.get("text")
+        ).strip()
+
+        # Ignore empty or unfinished messages.
+        if not content:
+            continue
+
+        if role == "user":
+            converted.append(HumanMessage(content=content))
+
+        elif role == "assistant":
+            converted.append(AIMessage(content=content))
+
+    return converted

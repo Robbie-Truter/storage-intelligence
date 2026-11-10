@@ -181,7 +181,11 @@ async def analyze(
         yield _sse_frame({"type": "text-start", "id": text_id})
 
         try:
-            async for event in stream_readonly_analysis(agent, request.path, request.question):
+            async for event in stream_readonly_analysis(
+                agent,
+                request.path,
+                messages=request.messages,
+            ):
                 print("AGENT EVENT:", event["type"])
                 ui_event = _to_ui_events(event, text_id)
                 if ui_event:
