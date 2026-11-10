@@ -1,5 +1,5 @@
 import { AlertCircle, RefreshCw } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -34,15 +34,10 @@ export function ModelSelector() {
 		[models],
 	);
 
-	// Default to the first available entry without hardcoding IDs
-	useEffect(() => {
-		if (allModels.length > 0) {
-			const currentIsValid = allModels.some((m) => m.id === modelId);
-			if (!modelId || !currentIsValid) {
-				setModelId(allModels[0].id);
-			}
-		}
-	}, [allModels, modelId, setModelId]);
+	const selectedModel = useMemo(
+		() => allModels.find((m) => m.id === modelId),
+		[allModels, modelId],
+	);
 
 	// Group models by provider
 	const groupedByProvider = useMemo(() => {
@@ -54,11 +49,6 @@ export function ModelSelector() {
 		}
 		return Array.from(groups.entries());
 	}, [allModels]);
-
-	const selectedModel = useMemo(
-		() => allModels.find((m) => m.id === modelId),
-		[allModels, modelId],
-	);
 
 	if (isPending) {
 		return (

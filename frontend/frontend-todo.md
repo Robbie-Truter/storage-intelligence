@@ -109,7 +109,8 @@ and a readiness-aware shell. No Home/Assistant product UI yet.
       changes.
 - [x] Implement `SettingsProvider`: selected model id and custom models in React
       state; `setModelId` / `addCustomModel`. Provider keys are not held in
-      context. Keep the model id in memory for v1 (simplest safe default).
+      context. Remember the last model as `{ provider, model_name }` under
+      `storage-intelligence-model` so the choice survives reloads.
 - [x] Build `AppShell` with a sidebar and content outlet, plus `PageHeader`
       (title, description, actions). Keep the shell simple; collapse and mobile
       overlay are Phase 6.
@@ -208,7 +209,8 @@ explicit privacy copy. Reference handoff §8.3.
 
 - [ ] The model list comes from the backend; no model id or count is hardcoded.
 - [ ] Settings shows Local/Cloud, and the Ollama key field is absent.
-- [ ] DevTools Application storage contains theme only; no key material.
+- [ ] DevTools Application storage contains theme and model preference only;
+      no key material.
 - [ ] A models request failure shows a retryable error.
 - [ ] `npm run check`, `npm run typecheck`, and `npm run build` pass.
 
