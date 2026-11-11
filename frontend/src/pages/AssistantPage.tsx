@@ -19,7 +19,7 @@ export function AssistantPage() {
 
 	const { modelId, selectedModel, hasKey } = useAnalyzeRequest();
 
-	const { messages, sendMessage, status, error } = useChat({
+	const { messages, sendMessage, status, stop, error } = useChat({
 		transport: new DefaultChatTransport({
 			api: `${import.meta.env.VITE_API_BASE_URL}/api/agent/analyze`,
 		}),
@@ -251,6 +251,7 @@ export function AssistantPage() {
 					canSend={canSend}
 					isSending={isLoading}
 					onSend={handleSend}
+					onCancel={stop}
 				/>
 			</div>
 		</div>

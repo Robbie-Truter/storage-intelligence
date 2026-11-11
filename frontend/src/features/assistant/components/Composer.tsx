@@ -1,3 +1,4 @@
+import { Square } from "lucide-react";
 import { useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -5,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { AgentModelOption } from "@/lib/api/types";
+import { cn } from "@/lib/utils";
 import { PromptSuggestions } from "./PromptSuggestions";
 
 interface ComposerProps {
@@ -17,6 +19,7 @@ interface ComposerProps {
 	canSend: boolean;
 	isSending: boolean;
 	onSend: () => void;
+	onCancel: () => void;
 }
 
 export function Composer({
@@ -29,6 +32,7 @@ export function Composer({
 	canSend,
 	isSending,
 	onSend,
+	onCancel,
 }: ComposerProps) {
 	const questionRef = useRef<HTMLTextAreaElement>(null);
 
@@ -60,21 +64,36 @@ export function Composer({
 			</div>
 			<div className="space-y-2">
 				<Label htmlFor="assistant-question">Question (optional)</Label>
-				<Textarea
-					className="resize-none"
-					id="assistant-question"
-					placeholder="What should I look for?"
-					rows={3}
-					ref={questionRef}
-					value={question}
-					onChange={(event) => onQuestionChange(event.target.value)}
-					onKeyDown={(event) => {
-						if (event.key === "Enter" && !event.shiftKey) {
-							event.preventDefault();
-							event.currentTarget.form?.requestSubmit();
-						}
-					}}
-				/>
+				<div className="relative">
+					<Textarea
+						className={cn("resize-none", isSending && "pb-10")}
+						id="assistant-question"
+						placeholder="What should I look for?"
+						rows={3}
+						ref={questionRef}
+						value={question}
+						onChange={(event) => onQuestionChange(event.target.value)}
+						onKeyDown={(event) => {
+							if (event.key === "Enter" && !event.shiftKey) {
+								event.preventDefault();
+								event.currentTarget.form?.requestSubmit();
+							}
+						}}
+					/>
+					{isSending ? (
+						<Button
+							type="button"
+							variant="outline"
+							size="icon-sm"
+							className="absolute right-2 bottom-2 size-7 rounded-full"
+							disabled
+							aria-label="Stop analysis"
+							onClick={onCancel}
+						>
+							<Square className="size-3 fill-current" />
+						</Button>
+					) : null}
+				</div>
 			</div>
 			<PromptSuggestions disabled={isSending} onSelect={handlePromptSelect} />
 			<div className="flex flex-wrap items-center justify-between gap-2">
