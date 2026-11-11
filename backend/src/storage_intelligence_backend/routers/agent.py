@@ -17,12 +17,16 @@ Server-Sent Events (``text/event-stream``), one event per frame::
     data: {"type": "error", "detail": "..."}
 
 ``complete`` is the last event on a successful run; ``error`` is the last event
-when the run fails after the stream has opened.
+when the run fails after the stream has opened. When the client disconnects
+mid-stream the agent run is cancelled server-side instead of being left to
+finish in the background.
 """
 
+import asyncio
 import json
 import uuid
 from collections.abc import AsyncIterator
+from contextlib import suppress
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -108,7 +112,9 @@ async def analyze(
 
     The response is ``text/event-stream``. Each frame carries one event
     (``tool_call``, ``text_delta``, then ``complete``); a failure after the
-    stream opens ends it with an ``error`` event.
+    stream opens ends it with an ``error`` event. When the client disconnects
+    mid-stream - the browser aborting the fetch, for example - the agent run
+    is cancelled instead of running on.
 
     Status codes:
         200: the stream opened; inspect the ``event``/``type`` of each frame.
@@ -173,41 +179,13 @@ async def analyze(
         )
         raise AgentModelError(detail, status_code=503) from exc
 
-    async def _event_generator() -> AsyncIterator[str]:
-        message_id = str(uuid.uuid4())
-        text_id = str(uuid.uuid4())
-
-        yield _sse_frame({"type": "start", "messageId": message_id})
-        yield _sse_frame({"type": "text-start", "id": text_id})
-
-        try:
-            async for event in stream_readonly_analysis(
-                agent,
-                request.path,
-                messages=request.messages,
-            ):
-                print("AGENT EVENT:", event["type"])
-                ui_event = _to_ui_events(event, text_id)
-                if ui_event:
-                    yield _sse_frame(ui_event)
-
-            yield _sse_frame({"type": "text-end", "id": text_id})
-            yield _sse_frame({"type": "finish"})
-            yield "data: [DONE]\n\n"
-        except GraphRecursionError:
-            detail = (
-                "The agent reached its step limit of "
-                f"{settings.agent_max_iterations} steps before it could answer."
-            )
-            yield _sse_frame({"type": "error", "errorText": detail})
-        except (AgentModelError, MCPUnavailable) as exc:
-            message = exc.message if isinstance(exc, AgentModelError) else str(exc)
-            yield _sse_frame({"type": "error", "errorText": message})
-        except Exception as exc:
-            yield _sse_frame({"type": "error", "errorText": f"Unexpected error: {exc}"})
-
     return StreamingResponse(
-        _event_generator(),
+        _agent_event_stream(
+            agent,
+            request.path,
+            request.messages,
+            max_iterations=settings.agent_max_iterations,
+        ),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -215,6 +193,76 @@ async def analyze(
             "x-vercel-ai-ui-message-stream": "v1",
         },
     )
+
+
+async def _agent_event_stream(
+    agent: Any,
+    path: str | None,
+    messages: list[dict[str, Any]] | None,
+    *,
+    max_iterations: int,
+) -> AsyncIterator[str]:
+    """Stream one agent run as SSE frames, cancelling the run on disconnect.
+
+    The agent runs in its own task and its events travel through a queue, so
+    the response side and the agent side shut down independently: when the
+    client disconnects, the server cancels the task driving this generator
+    (Starlette raises ``CancelledError`` at the ``await`` this generator is
+    blocked on), and the ``finally`` below cancels the agent run rather than
+    letting it finish unnoticed in the background.
+
+    Agent failures are forwarded through the queue and re-raised on the
+    response side, so they end the stream with an ``error`` frame exactly as
+    they did when the generator awaited the agent directly.
+    """
+    message_id = str(uuid.uuid4())
+    text_id = str(uuid.uuid4())
+
+    yield _sse_frame({"type": "start", "messageId": message_id})
+    yield _sse_frame({"type": "text-start", "id": text_id})
+
+    queue: asyncio.Queue[dict[str, Any] | Exception | None] = asyncio.Queue()
+
+    async def _run_agent() -> None:
+        try:
+            async for event in stream_readonly_analysis(agent, path, messages=messages):
+                await queue.put(event)
+        except Exception as exc:
+            await queue.put(exc)
+        else:
+            await queue.put(None)
+
+    run_task = asyncio.create_task(_run_agent())
+
+    try:
+        while True:
+            item = await queue.get()
+            if isinstance(item, Exception):
+                raise item
+            if item is None:
+                break
+            ui_event = _to_ui_events(item, text_id)
+            if ui_event:
+                yield _sse_frame(ui_event)
+
+        yield _sse_frame({"type": "text-end", "id": text_id})
+        yield _sse_frame({"type": "finish"})
+        yield "data: [DONE]\n\n"
+    except GraphRecursionError:
+        detail = (
+            "The agent reached its step limit of "
+            f"{max_iterations} steps before it could answer."
+        )
+        yield _sse_frame({"type": "error", "errorText": detail})
+    except (AgentModelError, MCPUnavailable) as exc:
+        message = exc.message if isinstance(exc, AgentModelError) else str(exc)
+        yield _sse_frame({"type": "error", "errorText": message})
+    except Exception as exc:
+        yield _sse_frame({"type": "error", "errorText": f"Unexpected error: {exc}"})
+    finally:
+        run_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await run_task
 
 
 def _to_ui_events(event: dict[str, Any], id: str) -> dict[str, Any] | None:

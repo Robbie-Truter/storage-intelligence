@@ -2,7 +2,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { AnimatePresence, motion } from "framer-motion";
 import { MessagesSquare } from "lucide-react";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AssistantConversation } from "@/features/assistant/components/AssistantConversation";
@@ -24,6 +24,20 @@ export function AssistantPage() {
 			api: `${import.meta.env.VITE_API_BASE_URL}/api/agent/analyze`,
 		}),
 	});
+
+	useEffect(() => {
+		return () => {
+			stop();
+		};
+	}, [stop]);
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: Only scroll when the message count changes.
+	useLayoutEffect(() => {
+		const el = conversationRef.current;
+		if (el) {
+			el.scrollTop = el.scrollHeight;
+		}
+	}, [messages]);
 
 	const trimmedPath = path.trim();
 	const trimmedQuestion = question.trim();
@@ -73,14 +87,6 @@ export function AssistantPage() {
 	const traceToolCalls = lastAssistantMessage
 		? getTraceToolCalls(lastAssistantMessage)
 		: [];
-
-	// biome-ignore lint/correctness/useExhaustiveDependencies: Only scroll when the message count changes.
-	useLayoutEffect(() => {
-		const el = conversationRef.current;
-		if (el) {
-			el.scrollTop = el.scrollHeight;
-		}
-	}, [messages]);
 
 	const handleSend = async () => {
 		if (!modelId) {

@@ -184,14 +184,19 @@ def _allowed_tools() -> dict[str, BaseTool]:
     return {name: _stub_tool(name) for name in READONLY_TOOL_ALLOWLIST}
 
 
+def _user_messages(text: str) -> list[dict[str, Any]]:
+    """A one-message history in the Vercel AI SDK UIMessage shape."""
+    return [{"id": "m1", "role": "user", "parts": [{"type": "text", "text": text}]}]
+
+
 async def _analysis_result(
     agent: Any,
     path: str | None = None,
-    question: str | None = None,
+    messages: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Drain the event stream and return its final ``complete`` event."""
     final: dict[str, Any] | None = None
-    async for event in stream_readonly_analysis(agent, path, question):
+    async for event in stream_readonly_analysis(agent, path, messages=messages):
         if event["type"] == "complete":
             final = event
     assert final is not None
@@ -257,7 +262,7 @@ async def test_analysis_reports_the_tools_it_used(
         max_iterations=10,
     )
 
-    result = await _analysis_result(agent, "/data", "What is biggest?")
+    result = await _analysis_result(agent, "/data", _user_messages("What is biggest?"))
 
     assert result["summary"] == "The biggest file is /data/a."
     assert result["tool_calls"] == [
@@ -308,7 +313,7 @@ async def test_analysis_with_a_question_and_no_path_asks_without_a_path(
         max_iterations=10,
     )
 
-    result = await _analysis_result(agent, question="What is biggest?")
+    result = await _analysis_result(agent, messages=_user_messages("What is biggest?"))
 
     assert "What is biggest?" in model.asked[0][-1].content
     assert result["summary"] == "Nothing big here."

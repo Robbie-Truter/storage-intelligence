@@ -5,6 +5,8 @@ and no LLM credentials are needed. The fake manager hands over a tool
 catalogue and the fake model answers with fixed replies.
 """
 
+import asyncio
+import contextlib
 import json
 import re
 from collections.abc import Iterator
@@ -196,29 +198,60 @@ def _agent_client(fake_manager: FakeManager) -> TestClient:
     return TestClient(app)
 
 
+def _user_messages(text: str) -> list[dict[str, Any]]:
+    """A one-message history in the Vercel AI SDK UIMessage shape.
+
+    An empty ``text`` is what the frontend sends for a run without a
+    question; the backend then falls back to its default question.
+    """
+    return [{"id": "m1", "role": "user", "parts": [{"type": "text", "text": text}]}]
+
+
 def _sse_events(response: Any) -> list[dict[str, Any]]:
-    """The ``data`` payload of every SSE frame, in order."""
+    """The ``data`` payload of every SSE frame, in order.
+
+    The ``[DONE]`` sentinel that ends the stream is not JSON, so it is
+    skipped.
+    """
     return [
         json.loads(line[len("data: ") :])
         for line in response.text.splitlines()
-        if line.startswith("data: ")
+        if line.startswith("data: ") and line != "data: [DONE]"
     ]
 
 
-def _complete(response: Any) -> dict[str, Any]:
-    """The final ``complete`` event of a successful analysis stream."""
+def _summary(response: Any) -> str:
+    """The answer text, reassembled from the ``text-delta`` frames."""
+    return "".join(
+        event["delta"] for event in _sse_events(response) if event.get("type") == "text-delta"
+    )
+
+
+def _tool_calls(response: Any) -> list[dict[str, Any]]:
+    """The tool calls the stream reported, from the input/output frame pairs."""
     events = _sse_events(response)
-    complete = [event for event in events if event.get("type") == "complete"]
-    assert complete, events
-    return complete[-1]
+    inputs = [event for event in events if event.get("type") == "tool-input-available"]
+    outputs = {
+        event["toolCallId"]: event
+        for event in events
+        if event.get("type") == "tool-output-available"
+    }
+    return [
+        {
+            "name": event["toolName"],
+            "args": event["input"],
+            "output": outputs.get(event["toolCallId"], {}).get("output"),
+        }
+        for event in inputs
+    ]
 
 
 def _error(response: Any) -> str:
-    """The detail of the single ``error`` event of a failed stream."""
+    """The text of the single ``error`` event of a failed stream."""
     events = _sse_events(response)
     errors = [event for event in events if event.get("type") == "error"]
     assert errors, events
-    return errors[-1]["detail"]
+    return errors[-1]["errorText"]
 
 
 def test_models_lists_the_catalog_without_mcp_or_credentials(
@@ -262,6 +295,7 @@ def test_analyze_accepts_a_custom_model_for_a_supported_provider(
             "model_name": "gpt-4o",
             "api_key": "client-key",
             "path": "/tmp",
+            "messages": _user_messages(""),
         },
     )
 
@@ -280,6 +314,7 @@ def test_analyze_rejects_a_custom_model_for_an_unsupported_provider() -> None:
             "provider": "anthropic",
             "model_name": "claude-sonnet",
             "api_key": "client-key",
+            "messages": _user_messages(""),
         },
     )
 
@@ -299,6 +334,7 @@ def test_analyze_rejects_a_custom_model_without_a_name() -> None:
             "provider": "openai",
             "model_name": "   ",
             "api_key": "client-key",
+            "messages": _user_messages(""),
         },
     )
 
@@ -329,6 +365,7 @@ def test_analyze_uses_the_model_selected_in_the_body(
             "model": "google-gemini-2.5-flash",
             "api_key": "client-key",
             "path": "/tmp",
+            "messages": _user_messages(""),
         },
     )
 
@@ -337,7 +374,10 @@ def test_analyze_uses_the_model_selected_in_the_body(
     assert captured["api_key"] == "client-key"
 
 
-def test_analyze_requires_an_api_key_for_cloud_models() -> None:
+def test_analyze_requires_an_api_key_for_cloud_models(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(agent_router, "stored_api_key", lambda _provider: None)
     manager = FakeManager(tools=_allowed_tools())
 
     response = _agent_client(manager).post(
@@ -346,6 +386,7 @@ def test_analyze_requires_an_api_key_for_cloud_models() -> None:
             "provider": "openai",
             "model_name": "gpt-4.1",
             "model": "openai-gpt-4.1",
+            "messages": _user_messages(""),
         },
     )
 
@@ -374,6 +415,7 @@ def test_analyze_allows_ollama_without_an_api_key(
             "model_name": "llama3.1",
             "model": "ollama-llama3.1",
             "path": "/tmp",
+            "messages": _user_messages(""),
         },
     )
 
@@ -400,22 +442,19 @@ def test_analyze_returns_the_summary_and_the_tool_calls(
             "model": "openai-gpt-4.1",
             "api_key": "test-key",
             "path": "/tmp",
+            "messages": _user_messages(""),
         },
     )
 
     assert response.status_code == 200
-    assert _complete(response) == {
-        "type": "complete",
-        "summary": "The biggest file is /tmp/a.",
-        "tool_calls": [
-            {
-                "name": "find_large_files",
-                "args": {"path": "/tmp"},
-                "status": "ok",
-                "result": TOOL_RESULT,
-            }
-        ],
-    }
+    assert _summary(response) == "The biggest file is /tmp/a."
+    assert _tool_calls(response) == [
+        {
+            "name": "find_large_files",
+            "args": {"path": "/tmp"},
+            "output": [{"type": "text", "text": "done"}],
+        }
+    ]
 
 
 def test_analyze_without_a_question_asks_about_the_path(
@@ -432,11 +471,12 @@ def test_analyze_without_a_question_asks_about_the_path(
             "model": "openai-gpt-4.1",
             "api_key": "test-key",
             "path": "/tmp",
+            "messages": _user_messages(""),
         },
     )
 
     assert response.status_code == 200
-    assert _complete(response)["summary"] == "Nothing big here."
+    assert _summary(response) == "Nothing big here."
     assert "/tmp" in model.asked[0][-1].content
 
 
@@ -454,7 +494,7 @@ def test_analyze_sends_the_question_and_the_path_to_the_model(
             "model": "openai-gpt-4.1",
             "api_key": "test-key",
             "path": "/tmp",
-            "question": "What is biggest?",
+            "messages": _user_messages("What is biggest?"),
         },
     )
 
@@ -477,11 +517,12 @@ def test_analyze_without_a_path_asks_about_the_default_location(
             "model_name": "gpt-4.1",
             "model": "openai-gpt-4.1",
             "api_key": "test-key",
+            "messages": _user_messages(""),
         },
     )
 
     assert response.status_code == 200
-    assert _complete(response)["summary"] == "Nothing big here."
+    assert _summary(response) == "Nothing big here."
     prompt = model.asked[0][-1].content
     assert "default path" in prompt
     assert "Target path" in prompt
@@ -500,12 +541,12 @@ def test_analyze_with_only_a_question_keeps_the_question(
             "model_name": "gpt-4.1",
             "model": "openai-gpt-4.1",
             "api_key": "test-key",
-            "question": "What is biggest?",
+            "messages": _user_messages("What is biggest?"),
         },
     )
 
     assert response.status_code == 200
-    assert _complete(response)["summary"] == "Nothing big here."
+    assert _summary(response) == "Nothing big here."
     assert "What is biggest?" in model.asked[0][-1].content
 
 
@@ -518,6 +559,7 @@ def test_analyze_without_an_mcp_manager_returns_503(client: TestClient) -> None:
             "model": "openai-gpt-4.1",
             "api_key": "test-key",
             "path": "/tmp",
+            "messages": _user_messages(""),
         },
     )
 
@@ -547,6 +589,7 @@ def test_analyze_when_the_connection_breaks_streams_an_error(
             "model": "openai-gpt-4.1",
             "api_key": "test-key",
             "path": "/tmp",
+            "messages": _user_messages(""),
         },
     )
 
@@ -570,6 +613,7 @@ def test_analyze_when_the_step_cap_is_reached_streams_an_error(
             "model": "openai-gpt-4.1",
             "api_key": "test-key",
             "path": "/tmp",
+            "messages": _user_messages(""),
         },
     )
 
@@ -596,6 +640,7 @@ def test_analyze_when_the_model_cannot_be_built_returns_503(
             "model": "openai-gpt-4.1",
             "api_key": "test-key",
             "path": "/tmp",
+            "messages": _user_messages(""),
         },
     )
 
@@ -626,11 +671,12 @@ def test_analyze_never_binds_or_calls_trash_path(
             "model": "openai-gpt-4.1",
             "api_key": "test-key",
             "path": "/tmp",
+            "messages": _user_messages(""),
         },
     )
 
     assert response.status_code == 200
-    body = _complete(response)
+    tool_calls = _tool_calls(response)
 
     # The manager holds the raw trash_path tool ...
     assert "trash_path" in manager.state_tools
@@ -643,7 +689,7 @@ def test_analyze_never_binds_or_calls_trash_path(
     # ... and it shows up nowhere in the answer. preview_trash is the only
     # trash-related tool the agent can reach.
     assert "preview_trash" in bound
-    assert all(call["name"] != "trash_path" for call in body["tool_calls"])
+    assert all(call["name"] != "trash_path" for call in tool_calls)
 
 
 def test_analyze_when_gemini_is_overloaded_streams_an_error(
@@ -664,6 +710,7 @@ def test_analyze_when_gemini_is_overloaded_streams_an_error(
             "model": "google-gemini-2.5-flash",
             "api_key": "test-key",
             "path": "/tmp",
+            "messages": _user_messages(""),
         },
     )
 
@@ -692,6 +739,7 @@ def test_analyze_when_quota_exhausted_streams_an_error(
             "model": "openai-gpt-4.1",
             "api_key": "test-key",
             "path": "/tmp",
+            "messages": _user_messages(""),
         },
     )
 
@@ -720,8 +768,73 @@ def test_analyze_when_api_key_invalid_streams_an_error(
             "model": "openai-gpt-4.1",
             "api_key": "test-key",
             "path": "/tmp",
+            "messages": _user_messages(""),
         },
     )
 
     assert response.status_code == 200
     assert _error(response) == "Invalid API key provided for the model provider."
+
+
+async def test_agent_event_stream_cancels_the_run_when_the_consumer_disconnects(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A client disconnect must cancel the agent run, not orphan it.
+
+    The consumer task plays the part Starlette plays when the browser aborts
+    the request: it is cancelled mid-stream, and that cancellation has to
+    travel into the tool the agent is blocked on. The endpoint generator
+    owns the run in a task of its own, so a disconnect cancels it instead of
+    leaving it to finish in the background.
+    """
+    _fake_model(
+        monkeypatch,
+        _tool_call("find_large_files", {"path": "/tmp"}),
+        AIMessage(content="never reached"),
+    )
+
+    tool_cancelled = asyncio.Event()
+
+    async def call(**_: Any) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            tool_cancelled.set()
+            raise
+        return ([{"type": "text", "text": "done"}], {"structured_content": TOOL_RESULT})
+
+    blocking_tool = StructuredTool(
+        name="find_large_files",
+        description="stub find_large_files",
+        args_schema=_StubInput,
+        coroutine=call,
+        response_format="content_and_artifact",
+    )
+
+    manager = FakeManager(tools={"find_large_files": blocking_tool})
+    agent = storage_agent.build_agent(
+        model="openai:gpt-4.1",
+        manager=manager,
+        temperature=0,
+        max_iterations=8,
+    )
+
+    frames: list[str] = []
+
+    async def consume() -> None:
+        async for frame in agent_router._agent_event_stream(
+            agent, "/tmp", None, max_iterations=8
+        ):
+            frames.append(frame)
+
+    async def wait_for_tool_frame() -> None:
+        while not any("tool-input-available" in frame for frame in frames):
+            await asyncio.sleep(0.01)
+
+    consumer = asyncio.create_task(consume())
+    await asyncio.wait_for(wait_for_tool_frame(), timeout=10)
+    consumer.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await consumer
+
+    await asyncio.wait_for(tool_cancelled.wait(), timeout=10)

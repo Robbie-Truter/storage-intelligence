@@ -86,7 +86,6 @@ export function Composer({
 							variant="outline"
 							size="icon-sm"
 							className="absolute right-2 bottom-2 size-7 rounded-full"
-							disabled
 							aria-label="Stop analysis"
 							onClick={onCancel}
 						>
