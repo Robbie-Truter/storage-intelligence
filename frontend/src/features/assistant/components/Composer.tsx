@@ -1,9 +1,11 @@
+import { useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { AgentModelOption } from "@/lib/api/types";
+import { PromptSuggestions } from "./PromptSuggestions";
 
 interface ComposerProps {
 	path: string;
@@ -28,11 +30,18 @@ export function Composer({
 	isSending,
 	onSend,
 }: ComposerProps) {
+	const questionRef = useRef<HTMLTextAreaElement>(null);
+
 	const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
 		if (canSend && !isSending) {
 			onSend();
 		}
+	};
+
+	const handlePromptSelect = (message: string) => {
+		onQuestionChange(message);
+		questionRef.current?.focus();
 	};
 
 	return (
@@ -56,6 +65,7 @@ export function Composer({
 					id="assistant-question"
 					placeholder="What should I look for?"
 					rows={3}
+					ref={questionRef}
 					value={question}
 					onChange={(event) => onQuestionChange(event.target.value)}
 					onKeyDown={(event) => {
@@ -66,6 +76,7 @@ export function Composer({
 					}}
 				/>
 			</div>
+			<PromptSuggestions disabled={isSending} onSelect={handlePromptSelect} />
 			<div className="flex flex-wrap items-center justify-between gap-2">
 				<div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
 					<span>
