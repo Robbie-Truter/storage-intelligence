@@ -151,7 +151,7 @@ async def test_unreadable_file_skipped(
         # only raise for the tool's direct child.stat() call (storage.py:416);
         # raising for is_file() would otherwise abort the whole scan.
         caller = sys._getframe(1).f_code.co_name
-        if self.name == "big.bin" and caller == "find_large_files":
+        if self.name == "big.bin" and caller == "_scan":
             raise OSError("permission denied")
         return original_stat(self, *args, **kwargs)
 

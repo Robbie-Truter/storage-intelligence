@@ -32,11 +32,11 @@ from pathlib import Path
 from typing import Any
 
 from fastmcp import Client
-from fastmcp.client.transports import UvStdioTransport
 from langchain.mcp import MCPAdapter
 from langchain_core.tools import BaseTool
 from mcp.types import CallToolResult, TextContent
 
+from .cancellation import TrackingUvStdioTransport, cancel_active_requests
 from .errors import MCPToolError, MCPUnavailable
 
 READONLY_TOOL_ALLOWLIST: frozenset[str] = frozenset(
@@ -114,7 +114,7 @@ class StorageMCPClient:
         ``langchain_tools``). Connection failures propagate to the caller; the
         startup policy (fail fast vs. run degraded) belongs to the lifespan.
         """
-        transport = UvStdioTransport(
+        transport = TrackingUvStdioTransport(
             command=self.command,
             args=self.args,
             project_directory=Path(self.project_directory),
@@ -130,6 +130,14 @@ class StorageMCPClient:
         agent_tools = await self._adapter.list_tools()
         self._langchain_tools = {tool.name: tool for tool in agent_tools}
         self._ready = True
+
+    async def cancel_active_tool_requests(self, reason: str = "client disconnected") -> None:
+        """Cancel in-flight MCP tool calls issued by the current agent run."""
+        if self._client is None:
+            return
+        client = self._adapter.client if self._adapter is not None else self._client
+        if isinstance(client, Client):
+            await cancel_active_requests(client, reason)
 
     async def stop(self) -> None:
         """Close the MCP connection and release the subprocess.

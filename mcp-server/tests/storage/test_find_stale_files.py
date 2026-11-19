@@ -229,7 +229,7 @@ async def test_unreadable_file_skipped_silently(
         # only raise for the tool's direct child.stat() call; raising for
         # is_file() would otherwise abort the whole scan.
         caller = sys._getframe(1).f_code.co_name
-        if self == bad and caller == "find_stale_files":
+        if self == bad and caller == "_scan":
             raise OSError("permission denied")
         return real_stat(self, **kwargs)
 

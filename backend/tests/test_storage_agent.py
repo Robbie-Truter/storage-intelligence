@@ -14,7 +14,7 @@ from typing import Any
 
 import pytest
 from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
-from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage
+from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage, HumanMessage
 from langchain_core.outputs import ChatGenerationChunk, ChatResult
 from langchain_core.tools import BaseTool, StructuredTool, ToolException
 from langgraph.errors import GraphRecursionError
@@ -416,3 +416,50 @@ async def test_analysis_reports_model_overloaded_as_agent_model_error(
 
     assert exc_info.value.status_code == 503
     assert "overloaded" in exc_info.value.message.lower()
+
+
+def test_convert_messages_drops_unanswered_cancelled_user_message() -> None:
+    """When a previous user message was cancelled before getting an assistant
+    reply, it must be dropped from conversation history so the agent does not
+    try to re-answer it or re-run its tools alongside the new question.
+    """
+    from storage_intelligence_backend.agents.storage_agent import _convert_messages
+
+    raw_messages = [
+        {"role": "user", "parts": [{"type": "text", "text": "hello"}]},
+        {"role": "assistant", "parts": [{"type": "text", "text": "Hi there!"}]},
+        {
+            "role": "user",
+            "parts": [
+                {
+                    "type": "text",
+                    "text": "Are there duplicate files in this folder?",
+                }
+            ],
+        },
+        # Assistant was cancelled during tool call: no text part, only tool-input-available
+        {
+            "role": "assistant",
+            "parts": [
+                {
+                    "type": "tool-find_duplicate_files",
+                    "state": "input-available",
+                }
+            ],
+        },
+        # New question asked after cancelling:
+        {
+            "role": "user",
+            "parts": [{"type": "text", "text": "Show me junk files"}],
+        },
+    ]
+
+    converted = _convert_messages(raw_messages)
+
+    assert len(converted) == 3
+    assert isinstance(converted[0], HumanMessage)
+    assert converted[0].content == "hello"
+    assert isinstance(converted[1], AIMessage)
+    assert converted[1].content == "Hi there!"
+    assert isinstance(converted[2], HumanMessage)
+    assert converted[2].content == "Show me junk files"

@@ -42,6 +42,7 @@ from ..agents.storage_agent import build_agent, stream_readonly_analysis
 from ..config import get_settings
 from ..credentials.api_keys import PROVIDERS, CredentialStoreError, get_api_key
 from ..deps import get_mcp_manager
+from ..mcp.cancellation import reset_current_run_id, set_current_run_id
 from ..mcp.errors import MCPUnavailable
 from ..mcp.manager import StorageMCPClient
 from ..schemas import AgentAnalyzeRequest, AgentModelOption
@@ -185,6 +186,7 @@ async def analyze(
             request.path,
             request.messages,
             max_iterations=settings.agent_max_iterations,
+            manager=manager,
         ),
         media_type="text/event-stream",
         headers={
@@ -196,6 +198,27 @@ async def analyze(
 
 
 async def _agent_event_stream(
+    agent: Any,
+    path: str | None,
+    messages: list[dict[str, Any]] | None,
+    *,
+    max_iterations: int,
+    manager: StorageMCPClient | None = None,
+) -> AsyncIterator[str]:
+    """Stream one agent run as SSE frames, cancelling work on disconnect."""
+    token = set_current_run_id(str(uuid.uuid4()))
+    try:
+        async for frame in _stream_agent_events(
+            agent, path, messages, max_iterations=max_iterations
+        ):
+            yield frame
+    finally:
+        if manager is not None:
+            await manager.cancel_active_tool_requests()
+        reset_current_run_id(token)
+
+
+async def _stream_agent_events(
     agent: Any,
     path: str | None,
     messages: list[dict[str, Any]] | None,

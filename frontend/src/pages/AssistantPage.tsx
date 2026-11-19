@@ -59,7 +59,9 @@ export function AssistantPage() {
 				(part.state === "output-available" || part.state === "output-error"),
 		);
 
-	const getTraceToolCalls = (message: UIMessage) =>
+	// Live trace (shown while isLoading): include in-progress tool calls so the
+	// spinner appears as soon as the tool is invoked.
+	const getLiveTraceToolCalls = (message: UIMessage) =>
 		message.parts.filter(
 			(part): part is AgentToolCall =>
 				part.type.startsWith("tool-") &&
@@ -68,6 +70,17 @@ export function AssistantPage() {
 					part.state === "input-available" ||
 					part.state === "output-available" ||
 					part.state === "output-error"),
+		);
+
+	// Collapsed trace (shown after completion): only completed/errored calls.
+	// Excluding input-streaming/input-available prevents cancelled tool calls
+	// from showing a permanent loading spinner after the stream is stopped.
+	const getCompletedTraceToolCalls = (message: UIMessage) =>
+		message.parts.filter(
+			(part): part is AgentToolCall =>
+				part.type.startsWith("tool-") &&
+				"state" in part &&
+				(part.state === "output-available" || part.state === "output-error"),
 		);
 
 	const messageHistory = messages.map((message) => {
@@ -84,8 +97,12 @@ export function AssistantPage() {
 	const lastAssistantMessage =
 		lastMessage?.role === "assistant" ? lastMessage : undefined;
 
-	const traceToolCalls = lastAssistantMessage
-		? getTraceToolCalls(lastAssistantMessage)
+	const liveTraceToolCalls = lastAssistantMessage
+		? getLiveTraceToolCalls(lastAssistantMessage)
+		: [];
+
+	const completedTraceToolCalls = lastAssistantMessage
+		? getCompletedTraceToolCalls(lastAssistantMessage)
 		: [];
 
 	const handleSend = async () => {
@@ -230,18 +247,18 @@ export function AssistantPage() {
 								</motion.span>
 							</div>
 
-							<ToolTrace toolCalls={traceToolCalls} />
+							<ToolTrace toolCalls={liveTraceToolCalls} />
 						</motion.div>
 					) : null}
 				</AnimatePresence>
 
-				{!isLoading && traceToolCalls.length > 0 && (
+				{!isLoading && completedTraceToolCalls.length > 0 && (
 					<motion.div
 						initial={{ opacity: 0, y: 12 }}
 						animate={{ opacity: 1, y: 0 }}
 						className="pl-1"
 					>
-						<ToolTrace toolCalls={traceToolCalls} collapsed />
+						<ToolTrace toolCalls={completedTraceToolCalls} collapsed />
 					</motion.div>
 				)}
 			</div>

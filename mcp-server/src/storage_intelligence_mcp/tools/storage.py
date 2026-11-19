@@ -1,17 +1,22 @@
+import asyncio
 import fnmatch
 import hashlib
 import shutil
+import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Literal
 
 from fastmcp import Context
+from fastmcp.utilities.logging import get_logger
 from mcp.types import ToolAnnotations
 
 from storage_intelligence_mcp.core import mcp
 from storage_intelligence_mcp.utils import (
     CountFilesResult,
     DirectoryDiskUsageResult,
+    DirectoryUsageEntry,
     DuplicateFileGroup,
     ExploreDirectoryEntry,
     ExploreDirectoryResult,
@@ -24,6 +29,8 @@ from storage_intelligence_mcp.utils import (
     not_a_directory_error,
     path_error,
 )
+
+logger = get_logger(__name__)
 
 # ===============================================
 # List of storage analysis tools, in the order they are implemented:
@@ -83,6 +90,57 @@ JUNK_EXTENSIONS: frozenset[str] = frozenset(
 JUNK_DIRECTORIES: frozenset[str] = frozenset(
     {"node_modules", "__pycache__", "dist", "build", "target"}
 )
+
+
+async def _run_scan[T](scan: Callable[[threading.Event], T]) -> T:
+    """Run a blocking scan in a worker thread with cooperative cancellation.
+
+    `asyncio.to_thread` keeps the event loop free, but cancelling the await does
+    not stop the thread. Setting the shared event lets the worker notice the
+    cancellation and stop at its next loop iteration.
+
+    `asyncio.shield` prevents the asyncio task wrapping the thread from being
+    cancelled when this coroutine is cancelled, so the thread continues to wind
+    down cooperatively (driven by the cancel flag) rather than being abruptly
+    torn down. We do NOT await the thread task after signalling — that would
+    block the event loop while the thread finishes its current iteration, which
+    is exactly what prevented `CancelledError` from propagating quickly to the
+    caller (LangGraph). The task completes in the background naturally once it
+    sees the flag.
+    """
+    started = time.monotonic()
+    scan_name = getattr(scan, "__name__", "scan")
+    cancel = threading.Event()
+
+    def worker() -> T:
+        try:
+            return scan(cancel)
+        finally:
+            logger.info(
+                "%s worker finished after %.2fs (cancel_requested=%s)",
+                scan_name,
+                time.monotonic() - started,
+                cancel.is_set(),
+            )
+
+    task = asyncio.create_task(asyncio.to_thread(worker))
+    try:
+        result = await asyncio.shield(task)
+    except asyncio.CancelledError:
+        cancel.set()
+        logger.info(
+            "%s cancelled after %.2fs; worker stop signalled",
+            scan_name,
+            time.monotonic() - started,
+        )
+        raise
+    logger.info(
+        "%s completed after %.2fs (cancel_requested=%s)",
+        scan_name,
+        time.monotonic() - started,
+        cancel.is_set(),
+    )
+    return result
 
 
 # 1. explore_directory - what is in this directory?
@@ -153,44 +211,54 @@ async def explore_directory(
 
         await ctx.info(f"Listing directory: {path}")
 
-        entries: list[ExploreDirectoryEntry] = []
-        truncated = False
+        def _scan(
+            cancel: threading.Event,
+        ) -> tuple[list[ExploreDirectoryEntry], bool]:
+            entries: list[ExploreDirectoryEntry] = []
+            truncated = False
 
-        path_contents = p.rglob("*") if recursive else p.iterdir()
+            path_contents = p.rglob("*") if recursive else p.iterdir()
 
-        for child in path_contents:
-            child_name = child.name
+            for child in path_contents:
+                if cancel.is_set():
+                    break
 
-            if pattern and not fnmatch.fnmatch(child_name, pattern):
-                continue
+                child_name = child.name
 
-            if search and search.lower() not in child_name.lower():
-                continue
+                if pattern and not fnmatch.fnmatch(child_name, pattern):
+                    continue
 
-            is_dir = child.is_dir()
-            is_file = child.is_file()
+                if search and search.lower() not in child_name.lower():
+                    continue
 
-            if kind == "files" and not is_file:
-                continue
-            if kind == "dirs" and not is_dir:
-                continue
+                is_dir = child.is_dir()
+                is_file = child.is_file()
 
-            # Checked before appending: reaching the cap only proves
-            # truncation when one more match actually exists, so an exact
-            # fit stays truncated=False.
-            if len(entries) >= max_results:
-                truncated = True
-                break
+                if kind == "files" and not is_file:
+                    continue
+                if kind == "dirs" and not is_dir:
+                    continue
 
-            prefix = "directory" if is_dir else "file"
-            entry_name = child.relative_to(p) if recursive else child.name
-            entries.append(
-                {
-                    "name": child.name,
-                    "path": str(p / entry_name),
-                    "type": prefix,
-                }
-            )
+                # Checked before appending: reaching the cap only proves
+                # truncation when one more match actually exists, so an exact
+                # fit stays truncated=False.
+                if len(entries) >= max_results:
+                    truncated = True
+                    break
+
+                prefix = "directory" if is_dir else "file"
+                entry_name = child.relative_to(p) if recursive else child.name
+                entries.append(
+                    {
+                        "name": child.name,
+                        "path": str(p / entry_name),
+                        "type": prefix,
+                    }
+                )
+
+            return entries, truncated
+
+        entries, truncated = await _run_scan(_scan)
 
         await ctx.info(
             f"explore_directory completed successfully: {len(entries)} entries "
@@ -308,48 +376,58 @@ async def directory_disk_usage(
         if not p.is_dir():
             raise not_a_directory_error(path)
 
-        def dir_size(d: Path) -> int:
-            total = 0
-            for child in d.rglob("*"):
+        def _scan(
+            cancel: threading.Event,
+        ) -> tuple[int, list[DirectoryUsageEntry]]:
+            def dir_size(d: Path) -> int:
+                total = 0
+                for child in d.rglob("*"):
+                    if cancel.is_set():
+                        return total
+                    if child.is_file():
+                        try:
+                            total += child.stat().st_size
+                        except OSError:
+                            continue
+                return total
+
+            results: list[DirectoryUsageEntry] = []
+
+            for child in p.iterdir():
+                if cancel.is_set():
+                    break
+
                 if child.is_file():
                     try:
-                        total += child.stat().st_size
+                        size_bytes = child.stat().st_size
                     except OSError:
                         continue
-            return total
+                    results.append(
+                        {
+                            "name": child.name,
+                            "type": "file",
+                            "size_bytes": size_bytes,
+                        }
+                    )
+                elif child.is_dir():
+                    results.append(
+                        {
+                            "name": child.name,
+                            "type": "directory",
+                            "size_bytes": dir_size(child),
+                        }
+                    )
+                else:
+                    continue
+            results.sort(key=lambda x: x["size_bytes"], reverse=True)
+            return len(results), results[:top_n]
 
         await ctx.info(f"Computing recursive disk usage in: {path} (top_n={top_n})")
 
-        results = []
-
-        for child in p.iterdir():
-            if child.is_file():
-                try:
-                    size_bytes = child.stat().st_size
-                except OSError:
-                    continue
-                results.append(
-                    {
-                        "name": child.name,
-                        "type": "file",
-                        "size_bytes": size_bytes,
-                    }
-                )
-            elif child.is_dir():
-                results.append(
-                    {
-                        "name": child.name,
-                        "type": "directory",
-                        "size_bytes": dir_size(child),
-                    }
-                )
-            else:
-                continue
-        results.sort(key=lambda x: x["size_bytes"], reverse=True)
-        entries = results[:top_n]
+        ranked_count, entries = await _run_scan(_scan)
 
         await ctx.info(
-            f"directory_disk_usage completed successfully: ranked {len(results)} "
+            f"directory_disk_usage completed successfully: ranked {ranked_count} "
             f"entries, returning {len(entries)} in {p}"
         )
         return {"path": str(p), "entries": entries}
@@ -521,27 +599,33 @@ async def find_large_files(
             f"(max_results={max_results})"
         )
         min_bytes = min_size_mb * 1024 * 1024
-        results = []
-        for child in p.rglob("*"):
-            if not child.is_file():
-                continue
-            try:
-                size = child.stat().st_size
-            except OSError:
-                continue
-            if size >= min_bytes:
-                results.append(
-                    {
-                        "path": str(child),
-                        "size_bytes": size,
-                        "size_mb": round(size / (1024 * 1024), 1),
-                    }
-                )
-        results.sort(key=lambda x: x["size_bytes"], reverse=True)
-        matches = results[:max_results]
+
+        def _scan(cancel: threading.Event) -> tuple[int, list[LargeFileEntry]]:
+            results: list[LargeFileEntry] = []
+            for child in p.rglob("*"):
+                if cancel.is_set():
+                    break
+                if not child.is_file():
+                    continue
+                try:
+                    size = child.stat().st_size
+                except OSError:
+                    continue
+                if size >= min_bytes:
+                    results.append(
+                        {
+                            "path": str(child),
+                            "size_bytes": size,
+                            "size_mb": round(size / (1024 * 1024), 1),
+                        }
+                    )
+            results.sort(key=lambda x: x["size_bytes"], reverse=True)
+            return len(results), results[:max_results]
+
+        found_count, matches = await _run_scan(_scan)
 
         await ctx.info(
-            f"find_large_files completed successfully: found {len(results)} "
+            f"find_large_files completed successfully: found {found_count} "
             f"matches, returning {len(matches)} in {p}"
         )
         return matches
@@ -594,40 +678,55 @@ async def find_duplicate_files(
             f"Scanning for duplicates in: {path} (min_size_bytes={min_size_bytes})"
         )
 
-        def file_hash(fp: Path, chunk_size: int = 65536) -> str:
-            h = hashlib.sha256()
-            with fp.open("rb") as f:
-                while chunk := f.read(chunk_size):
-                    h.update(chunk)
-            return h.hexdigest()
+        def _scan(cancel: threading.Event) -> list[DuplicateFileGroup]:
+            def file_hash(fp: Path, chunk_size: int = 65536) -> str | None:
+                h = hashlib.sha256()
+                with fp.open("rb") as f:
+                    while chunk := f.read(chunk_size):
+                        if cancel.is_set():
+                            return None
+                        h.update(chunk)
+                return h.hexdigest()
 
-        by_size: dict[int, list[Path]] = {}
-        for child in p.rglob("*"):
-            if not child.is_file():
-                continue
-            try:
-                size = child.stat().st_size
-            except OSError:
-                continue
-            if size >= min_size_bytes:
-                by_size.setdefault(size, []).append(child)
-
-        groups: dict[tuple[int, str], list[str]] = {}
-        for size, files in by_size.items():
-            if len(files) < 2:
-                continue
-            for fp in files:
+            by_size: dict[int, list[Path]] = {}
+            for child in p.rglob("*"):
+                if cancel.is_set():
+                    break
+                if not child.is_file():
+                    continue
                 try:
-                    digest = file_hash(fp)
+                    size = child.stat().st_size
                 except OSError:
                     continue
-                groups.setdefault((size, digest), []).append(str(fp))
+                if size >= min_size_bytes:
+                    by_size.setdefault(size, []).append(child)
 
-        duplicate_groups: list[DuplicateFileGroup] = [
-            {"size_bytes": size, "files": paths}
-            for (size, _digest), paths in sorted(groups.items(), key=lambda x: -x[0][0])
-            if len(paths) > 1
-        ]
+            groups: dict[tuple[int, str], list[str]] = {}
+            for size, files in by_size.items():
+                if cancel.is_set():
+                    break
+                if len(files) < 2:
+                    continue
+                for fp in files:
+                    if cancel.is_set():
+                        break
+                    try:
+                        digest = file_hash(fp)
+                    except OSError:
+                        continue
+                    if digest is None:
+                        break
+                    groups.setdefault((size, digest), []).append(str(fp))
+
+            return [
+                {"size_bytes": size, "files": paths}
+                for (size, _digest), paths in sorted(
+                    groups.items(), key=lambda x: -x[0][0]
+                )
+                if len(paths) > 1
+            ]
+
+        duplicate_groups = await _run_scan(_scan)
         duplicate_files = sum(len(group["files"]) for group in duplicate_groups)
 
         await ctx.info(
@@ -693,31 +792,37 @@ async def find_stale_files(
 
         now = time.time()
         threshold_seconds = days_unmodified * 86400
-        stale_files = []
 
-        for child in p.rglob("*"):
-            if not child.is_file():
-                continue
-            try:
-                stat_result = child.stat()
-                mtime = stat_result.st_mtime
-                age_seconds = now - mtime
-                if age_seconds > threshold_seconds:
-                    stale_files.append(
-                        {
-                            "path": str(child),
-                            "size_bytes": stat_result.st_size,
-                            "days_unmodified": round(age_seconds / 86400, 1),
-                        }
-                    )
-            except OSError:
-                continue
+        def _scan(cancel: threading.Event) -> tuple[int, list[StaleFileEntry]]:
+            stale_files: list[StaleFileEntry] = []
 
-        stale_files.sort(key=lambda x: x["days_unmodified"], reverse=True)
-        matches = stale_files[:max_results]
+            for child in p.rglob("*"):
+                if cancel.is_set():
+                    break
+                if not child.is_file():
+                    continue
+                try:
+                    stat_result = child.stat()
+                    mtime = stat_result.st_mtime
+                    age_seconds = now - mtime
+                    if age_seconds > threshold_seconds:
+                        stale_files.append(
+                            {
+                                "path": str(child),
+                                "size_bytes": stat_result.st_size,
+                                "days_unmodified": round(age_seconds / 86400, 1),
+                            }
+                        )
+                except OSError:
+                    continue
+
+            stale_files.sort(key=lambda x: x["days_unmodified"], reverse=True)
+            return len(stale_files), stale_files[:max_results]
+
+        found_count, matches = await _run_scan(_scan)
 
         await ctx.info(
-            f"find_stale_files completed successfully: found {len(stale_files)} "
+            f"find_stale_files completed successfully: found {found_count} "
             f"stale files, returning {len(matches)} in {p}"
         )
         return matches
@@ -776,53 +881,70 @@ async def find_empty_directories(
         if not p.is_dir():
             raise not_a_directory_error(path)
 
-        if recursive:
-            subdirs = sorted(
-                [d for d in p.rglob("*") if d.is_dir()],
-                key=lambda d: len(d.parts),
-                reverse=True,
-            )
-        else:
-            subdirs = [d for d in p.iterdir() if d.is_dir()]
-
         await ctx.info(
             f"Scanning for empty directories in: {path} (recursive={recursive})"
         )
 
-        # Directories that would be deleted. Read-only here: nothing is removed,
-        # so this is a prediction of what a delete run would remove.
-        virtual_deleted: set[Path] = set()
-        skipped_dirs: list[str] = []
+        def _scan(
+            cancel: threading.Event,
+        ) -> tuple[list[Path], list[tuple[str, str]]]:
+            subdirs: list[Path] = []
+            if recursive:
+                for d in p.rglob("*"):
+                    if cancel.is_set():
+                        break
+                    if d.is_dir():
+                        subdirs.append(d)
+                subdirs.sort(key=lambda d: len(d.parts), reverse=True)
+            else:
+                for d in p.iterdir():
+                    if cancel.is_set():
+                        break
+                    if d.is_dir():
+                        subdirs.append(d)
 
-        for subdir in subdirs:
-            try:
-                contents = list(subdir.iterdir())
-            except OSError as exc:
-                skipped_dirs.append(str(subdir))
-                await ctx.warning(
-                    f"Skipped unreadable directory '{subdir}': "
-                    f"{type(exc).__name__}: {exc}"
-                )
-                continue
-            # A child already in the set still shows up in its parent's listing,
-            # because nothing was actually removed. Filter those out before
-            # judging emptiness, otherwise a parent that becomes empty only
-            # because its children were deleted is never reported.
-            remaining = [c for c in contents if c not in virtual_deleted]
+            # Directories that would be deleted. Read-only here: nothing is
+            # removed, so this is a prediction of what a delete run would remove.
+            virtual_deleted: set[Path] = set()
+            skipped: list[tuple[str, str]] = []
 
-            if not remaining:
-                virtual_deleted.add(subdir)
+            for subdir in subdirs:
+                if cancel.is_set():
+                    break
+                try:
+                    contents = list(subdir.iterdir())
+                except OSError as exc:
+                    skipped.append((str(subdir), f"{type(exc).__name__}: {exc}"))
+                    continue
+                # A child already in the set still shows up in its parent's
+                # listing, because nothing was actually removed. Filter those out
+                # before judging emptiness, otherwise a parent that becomes empty
+                # only because its children were deleted is never reported.
+                remaining = [c for c in contents if c not in virtual_deleted]
 
-        # Deepest first, and tie-break on the path so the order is stable across
-        # runs. This is not cosmetic: it is the order the paths must be deleted
-        # in. Trashing a parent first would succeed and carry its children away
-        # with it, leaving every child to fail afterwards as "File not found".
-        candidates = sorted(virtual_deleted, key=lambda d: (-len(d.parts), str(d)))
+                if not remaining:
+                    virtual_deleted.add(subdir)
+
+            # Deepest first, and tie-break on the path so the order is stable
+            # across runs. This is not cosmetic: it is the order the paths must
+            # be deleted in. Trashing a parent first would succeed and carry its
+            # children away with it, leaving every child to fail afterwards as
+            # "File not found".
+            candidates = sorted(virtual_deleted, key=lambda d: (-len(d.parts), str(d)))
+            return candidates, skipped
+
+        candidates, skipped = await _run_scan(_scan)
+
+        for skipped_path, reason in skipped:
+            await ctx.warning(
+                f"Skipped unreadable directory '{skipped_path}': {reason}"
+            )
+
         total = len(candidates)
 
         await ctx.info(
             f"find_empty_directories completed successfully: {total} empty "
-            f"directories, {len(skipped_dirs)} skipped in {p}"
+            f"directories, {len(skipped)} skipped in {p}"
         )
         return {
             "path": str(p),
@@ -830,8 +952,8 @@ async def find_empty_directories(
             "total_empty_directories": total,
             "sample": [str(d) for d in candidates[:SAMPLE_LIMIT]],
             "truncated": total > SAMPLE_LIMIT,
-            "skipped_directories_count": len(skipped_dirs),
-            "skipped_directories": skipped_dirs,
+            "skipped_directories_count": len(skipped),
+            "skipped_directories": [skipped_path for skipped_path, _ in skipped],
         }
     except Exception as exc:
         await ctx.error(f"find_empty_directories failed: {type(exc).__name__}: {exc}")

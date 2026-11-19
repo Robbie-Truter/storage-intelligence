@@ -6,6 +6,7 @@ tool); the raw ``trash_path`` tool is never among them. The allowlist is the
 manager's business - see ``StorageMCPClient.langchain_tools``.
 """
 
+import asyncio
 import os
 from collections.abc import AsyncIterator
 from typing import Any
@@ -124,11 +125,18 @@ async def stream_readonly_analysis(
     seen_tool_ids: set[str] = set()
     all_messages: list[Any] = []
 
+    # Hold a reference so we can call aclose() in the finally block.
+    # This is critical for cancellation: if the caller task is cancelled,
+    # the finally block fires aclose() which propagates GeneratorExit into
+    # LangGraph's Pregel loop and signals its internal task groups to stop.
+    # Without this, LangGraph's in-flight tool call tasks become orphaned
+    # and keep running even after the HTTP client has disconnected.
+    stream = agent.astream_events(
+        {"messages": conversation},
+        version="v2",
+    )
     try:
-        async for event in agent.astream_events(
-            {"messages": conversation},
-            version="v2",
-        ):
+        async for event in stream:
             kind: str = event["event"]
 
             # --- Incremental text from the final answer ---
@@ -167,6 +175,8 @@ async def stream_readonly_analysis(
                 output = event["data"].get("output") or {}
                 all_messages = output.get("messages", [])
 
+    except asyncio.CancelledError:
+        raise
     except (MCPError, GraphRecursionError):
         raise
     except ConnectionError as exc:
@@ -174,6 +184,12 @@ async def stream_readonly_analysis(
     except Exception as exc:
         status_code, clean_message = format_model_error(exc)
         raise AgentModelError(clean_message, status_code=status_code) from exc
+    finally:
+        # aclose() on an already-exhausted generator is a no-op, so this is
+        # always safe. On cancellation it is essential: it sends GeneratorExit
+        # into LangGraph's Pregel runner, which cancels its internal asyncio
+        # task groups (including any in-flight MCP tool call task).
+        await stream.aclose()
 
     yield {
         "type": "complete",
@@ -271,25 +287,60 @@ def _content_text(content: Any) -> str:
 
 
 def _convert_messages(messages: list[dict[str, Any]]) -> list[Any]:
-    """Convert Vercel AI SDK UIMessage objects into LangChain messages."""
-    converted: list[Any] = []
+    """Convert Vercel AI SDK UIMessage objects into LangChain messages.
 
+    Only completed user-assistant pairs are preserved in conversation history,
+    plus the final active user message.
+
+    If a previous user request was cancelled or aborted before the assistant
+    could produce a response, that unfulfilled user request is omitted from the
+    history. Otherwise, the agent would see multiple pending user prompts and
+    attempt to answer the cancelled question (re-invoking its tools) alongside
+    the new question.
+    """
+    raw_turns: list[tuple[str, str]] = []
     for message in messages:
         role = message.get("role")
+        if role not in ("user", "assistant"):
+            continue
         parts = message.get("parts", [])
-
-        # Extract text parts only for now.
         content = "\n".join(
             part["text"] for part in parts if part.get("type") == "text" and part.get("text")
         ).strip()
+        if content:
+            raw_turns.append((role, content))
 
-        # Ignore empty or unfinished messages.
-        if not content:
-            continue
+    history_turns: list[tuple[str, str]] = []
+    current_user_turn: tuple[str, str] | None = None
 
+    if raw_turns and raw_turns[-1][0] == "user":
+        current_user_turn = raw_turns[-1]
+        prior_turns = raw_turns[:-1]
+    else:
+        prior_turns = raw_turns
+
+    i = 0
+    while i < len(prior_turns):
+        role, _ = prior_turns[i]
+        if role == "user":
+            if i + 1 < len(prior_turns) and prior_turns[i + 1][0] == "assistant":
+                history_turns.append(prior_turns[i])
+                history_turns.append(prior_turns[i + 1])
+                i += 2
+            else:
+                # User message with no assistant response (cancelled/aborted) -> drop it.
+                i += 1
+        elif role == "assistant":
+            history_turns.append(prior_turns[i])
+            i += 1
+
+    if current_user_turn:
+        history_turns.append(current_user_turn)
+
+    converted: list[Any] = []
+    for role, content in history_turns:
         if role == "user":
             converted.append(HumanMessage(content=content))
-
         elif role == "assistant":
             converted.append(AIMessage(content=content))
 
