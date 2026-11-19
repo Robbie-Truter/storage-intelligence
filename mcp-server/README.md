@@ -114,7 +114,7 @@ in `tools/resources.py`. None of them modify the filesystem.
 | `find_duplicate_files` | `path`, `min_size_bytes=1024` | `[{size_bytes, files[]}]` |
 | `find_stale_files` | `path`, `days_unmodified=90`, `max_results=100` | `[{path, size_bytes, days_unmodified}]` |
 | `find_empty_directories` | `path`, `recursive=True` | `path`, `recursive`, `total_empty_directories`, `sample[]`, `truncated`, `skipped_directories_count`, `skipped_directories[]` |
-| `find_junk_files` | `path` | `path`, `total_files`, `by_extension`, `directories[]`, `sample[]`, `truncated` |
+| `find_junk_files` | `path` | `path`, `total_files`, `total_bytes`, `by_extension`, `directories[]`, `sample[]`, `truncated` |
 
 Behaviour worth knowing:
 

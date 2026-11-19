@@ -52,6 +52,7 @@ async def test_happy_path_counts_junk_files(ctx: AsyncMock, tree: Path) -> None:
     assert result["path"] == str(tree)
     # app.log, tmp.tmp, UPPER.LOG, .DS_Store — notes.txt is not junk.
     assert result["total_files"] == 4
+    assert result["total_bytes"] == 13
     assert result["by_extension"] == {".log": 2, ".tmp": 1, ".ds_store": 1}
     assert sum(result["by_extension"].values()) == result["total_files"]
 
@@ -149,6 +150,7 @@ async def test_empty_directory_returns_zero_result(
 
     assert result["path"] == str(tmp_path)
     assert result["total_files"] == 0
+    assert result["total_bytes"] == 0
     assert result["by_extension"] == {}
     assert result["directories"] == []
     assert result["sample"] == []

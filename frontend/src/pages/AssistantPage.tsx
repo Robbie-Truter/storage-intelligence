@@ -3,17 +3,22 @@ import { DefaultChatTransport, type UIMessage } from "ai";
 import { AnimatePresence, motion } from "framer-motion";
 import { MessagesSquare } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AssistantConversation } from "@/features/assistant/components/AssistantConversation";
 import { Composer } from "@/features/assistant/components/Composer";
 import { ToolTrace } from "@/features/assistant/components/ToolTrace";
 import { useAnalyzeRequest } from "@/features/assistant/hooks/useAnalyzeRequest";
+import type { AssistantPrefill } from "@/features/assistant/types";
 import type { AgentToolCall } from "@/lib/api/types";
 
 export function AssistantPage() {
-	const [path, setPath] = useState("");
-	const [question, setQuestion] = useState("");
+	const location = useLocation();
+	const navigate = useNavigate();
+	const prefill = (location.state ?? null) as AssistantPrefill | null;
+	const [path, setPath] = useState(prefill?.path ?? "");
+	const [question, setQuestion] = useState(prefill?.question ?? "");
 
 	const conversationRef = useRef<HTMLDivElement>(null);
 
@@ -30,6 +35,13 @@ export function AssistantPage() {
 			stop();
 		};
 	}, [stop]);
+
+	useEffect(() => {
+		if (!location.state) {
+			return;
+		}
+		navigate(location.pathname, { replace: true, state: null });
+	}, [location.state, location.pathname, navigate]);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: Only scroll when the message count changes.
 	useLayoutEffect(() => {

@@ -266,6 +266,9 @@ class FindJunkFilesResult(TypedDict):
     path - the directory that was inspected (direct children only).
     total_files - how many junk files matched; directories are not
         counted here. Never truncated.
+    total_bytes - sum of the apparent sizes of the matched junk files.
+        Empty when no junk files matched; build-artifact directory contents
+        are not measured.
     by_extension - count per matching suffix, largest count first, ties
         broken alphabetically. `.DS_Store` files group under ".ds_store"
         because a leading-dot name has no suffix to match on.
@@ -280,6 +283,7 @@ class FindJunkFilesResult(TypedDict):
 
     path: str
     total_files: int
+    total_bytes: int
     by_extension: dict[str, int]
     directories: list[str]
     sample: list[str]

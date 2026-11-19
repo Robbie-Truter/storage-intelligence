@@ -14,6 +14,24 @@ import { getApiErrorMessage } from "@/lib/api/errors";
 import { formatCount, formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
+const DONUT_COLORS = [
+	"var(--chart-1)",
+	"var(--chart-2)",
+	"var(--chart-3)",
+	"var(--chart-4)",
+	"var(--chart-5)",
+	"color-mix(in oklch, var(--chart-1) 55%, transparent)",
+	"color-mix(in oklch, var(--chart-2) 55%, transparent)",
+	"color-mix(in oklch, var(--chart-3) 55%, transparent)",
+	"color-mix(in oklch, var(--chart-4) 55%, transparent)",
+] as const;
+
+function groupColor(index: number, isRemainder: boolean): string {
+	return isRemainder
+		? "var(--muted-foreground)"
+		: (DONUT_COLORS[index % DONUT_COLORS.length] ?? "var(--muted-foreground)");
+}
+
 interface FilesByExtensionCardProps {
 	path?: string;
 }
@@ -59,6 +77,16 @@ export function FilesByExtensionCard({ path }: FilesByExtensionCardProps) {
 	];
 
 	const maxCount = Math.max(...displayGroups.map((g) => g.count), 1);
+
+	let cumulativePercent = 0;
+	const donutStops =
+		totalFiles > 0
+			? displayGroups.map((group, index) => {
+					const start = cumulativePercent;
+					cumulativePercent += (group.count / totalFiles) * 100;
+					return `${groupColor(index, group.isRemainder)} ${start.toFixed(2)}% ${cumulativePercent.toFixed(2)}%`;
+				})
+			: [];
 
 	return (
 		<Card className="overflow-hidden">
@@ -123,56 +151,90 @@ export function FilesByExtensionCard({ path }: FilesByExtensionCardProps) {
 				)}
 
 				{data && totalFiles > 0 && (
-					<div className="space-y-1.5">
-						{displayGroups.map((group) => {
-							const percentageOfTotal = (group.count / totalFiles) * 100;
-							const relativeWidth = Math.max(
-								2,
-								Math.round((group.count / maxCount) * 100),
-							);
-
-							return (
-								<div
-									key={group.label}
-									className="relative flex items-center justify-between gap-3 rounded-lg border border-border/70 bg-card p-2.5 text-sm overflow-hidden"
-								>
-									{/* Relative proportional background bar */}
-									<div
-										aria-hidden="true"
-										className={cn(
-											"absolute inset-y-0 left-0 opacity-15 pointer-events-none transition-all",
-											group.isRemainder ? "bg-muted-foreground" : "bg-primary",
-										)}
-										style={{ width: `${relativeWidth}%` }}
-									/>
-
-									<div className="relative flex min-w-0 items-center gap-2 z-10">
-										<span
-											className={cn(
-												"font-mono text-xs font-medium truncate",
-												group.label === "(no extension)" &&
-													"text-muted-foreground italic",
-											)}
-										>
-											{group.label}
-										</span>
-									</div>
-
-									<div className="relative flex shrink-0 items-center gap-3 z-10 text-xs">
-										<span className="font-mono font-medium">
-											{formatCount(group.count)}
-										</span>
-										<span className="text-muted-foreground font-mono w-12 text-right">
-											{formatPercent(percentageOfTotal)}
-										</span>
-									</div>
+					<div className="space-y-4">
+						<div className="flex items-center gap-3 rounded-lg border bg-card/60 p-2.5">
+							<div
+								aria-hidden="true"
+								className="relative size-16 shrink-0 rounded-full"
+								style={{
+									background: `conic-gradient(${donutStops.join(", ")})`,
+								}}
+							>
+								<div className="absolute inset-[6px] flex flex-col items-center justify-center rounded-full bg-card">
+									<span className="text-xs font-semibold">
+										{formatCount(totalFiles)}
+									</span>
+									<span className="text-[9px] text-muted-foreground">
+										files
+									</span>
 								</div>
-							);
-						})}
-						<p className="text-[11px] text-muted-foreground pt-1">
-							Top extensions shown; remainder grouped. Excludes subfolder
-							contents.
-						</p>
+							</div>
+							<p className="text-[11px] leading-relaxed text-muted-foreground">
+								Share of file types directly in this folder. Colors match the
+								groups below.
+							</p>
+						</div>
+
+						<div className="space-y-1.5">
+							{displayGroups.map((group, index) => {
+								const percentageOfTotal = (group.count / totalFiles) * 100;
+								const relativeWidth = Math.max(
+									2,
+									Math.round((group.count / maxCount) * 100),
+								);
+
+								return (
+									<div
+										key={group.label}
+										className="relative flex items-center justify-between gap-3 rounded-lg border border-border/70 bg-card p-2.5 text-sm overflow-hidden"
+									>
+										{/* Relative proportional background bar */}
+										<div
+											aria-hidden="true"
+											className={cn(
+												"absolute inset-y-0 left-0 opacity-15 pointer-events-none transition-all",
+												group.isRemainder
+													? "bg-muted-foreground"
+													: "bg-primary",
+											)}
+											style={{ width: `${relativeWidth}%` }}
+										/>
+
+										<div className="relative flex min-w-0 items-center gap-2 z-10">
+											<span
+												aria-hidden="true"
+												className="size-2 shrink-0 rounded-full"
+												style={{
+													backgroundColor: groupColor(index, group.isRemainder),
+												}}
+											/>
+											<span
+												className={cn(
+													"font-mono text-xs font-medium truncate",
+													group.label === "(no extension)" &&
+														"text-muted-foreground italic",
+												)}
+											>
+												{group.label}
+											</span>
+										</div>
+
+										<div className="relative flex shrink-0 items-center gap-3 z-10 text-xs">
+											<span className="font-mono font-medium">
+												{formatCount(group.count)}
+											</span>
+											<span className="text-muted-foreground font-mono w-12 text-right">
+												{formatPercent(percentageOfTotal)}
+											</span>
+										</div>
+									</div>
+								);
+							})}
+							<p className="text-[11px] text-muted-foreground pt-1">
+								Top extensions shown; remainder grouped. Excludes subfolder
+								contents.
+							</p>
+						</div>
 					</div>
 				)}
 			</CardContent>

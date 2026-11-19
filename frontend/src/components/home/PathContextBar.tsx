@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 interface PathContextBarProps {
 	draftValue: string;
 	appliedValue: string | undefined;
+	resolvedPath?: string;
 	onDraftChange: (value: string) => void;
 	onApply: () => void;
 	onReset: () => void;
@@ -13,6 +14,7 @@ interface PathContextBarProps {
 export function PathContextBar({
 	draftValue,
 	appliedValue,
+	resolvedPath,
 	onDraftChange,
 	onApply,
 	onReset,
@@ -27,7 +29,9 @@ export function PathContextBar({
 	const confirmationLine =
 		appliedValue && appliedValue.trim() !== ""
 			? `Applied path: ${appliedValue}`
-			: "Using backend default (home)";
+			: resolvedPath
+				? `Using your home directory: ${resolvedPath}`
+				: "Using your home directory";
 
 	return (
 		<div className="space-y-2">
@@ -40,20 +44,25 @@ export function PathContextBar({
 						value={draftValue}
 						onChange={(e) => onDraftChange(e.target.value)}
 						onKeyDown={handleKeyDown}
-						placeholder="/absolute/path or leave blank for default"
+						placeholder="/absolute/path (leave blank for home)"
 					/>
 				</div>
 				<div className="flex gap-2">
 					<Button type="button" onClick={onApply}>
 						Apply
 					</Button>
-					<Button type="button" variant="outline" onClick={onReset}>
+					<Button
+						type="button"
+						variant="outline"
+						onClick={onReset}
+						title="Reset to your home directory"
+					>
 						Reset
 					</Button>
 				</div>
 			</div>
 			<p className="text-muted-foreground text-xs">
-				Blank means the backend's default (home).
+				Leave blank to use your home directory (the backend default).
 			</p>
 			<p className="text-muted-foreground text-xs">{confirmationLine}</p>
 		</div>

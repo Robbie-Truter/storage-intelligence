@@ -5,6 +5,7 @@ import type {
 	DirectoryDiskUsageResponse,
 	DiskUsageResponse,
 	FileInfoResponse,
+	ReclaimableStorageResponse,
 } from "@/lib/api/types";
 
 /**
@@ -37,6 +38,7 @@ export async function getDirectoryUsage(
 				top_n: topN,
 				...(normalizedPath ? { path: normalizedPath } : {}),
 			},
+			timeout: 120_000,
 		},
 	);
 	return data;
@@ -66,5 +68,24 @@ export async function getFileInfo(path?: string): Promise<FileInfoResponse> {
 	const { data } = await api.get<FileInfoResponse>("/api/disk/info", {
 		params: normalizedPath ? { path: normalizedPath } : undefined,
 	});
+	return data;
+}
+
+/**
+ * Aggregate heuristic cleanup candidates for `path`.
+ * The backend runs four read-only scans and returns upper-bound estimates.
+ * Omit `path` entirely when blank.
+ */
+export async function getReclaimableStorage(
+	path?: string,
+): Promise<ReclaimableStorageResponse> {
+	const normalizedPath = toOptionalPath(path);
+	const { data } = await api.get<ReclaimableStorageResponse>(
+		"/api/disk/reclaimable",
+		{
+			params: normalizedPath ? { path: normalizedPath } : undefined,
+			timeout: 180_000,
+		},
+	);
 	return data;
 }

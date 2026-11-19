@@ -60,6 +60,31 @@ export interface FileInfoResponse {
 	extension: string;
 }
 
+export type ReclaimableCategoryId =
+	| "duplicates"
+	| "junk"
+	| "empty_directories"
+	| "other";
+
+export interface ReclaimableCategory {
+	category: ReclaimableCategoryId;
+	label: string;
+	estimated_bytes: number;
+	item_count: number;
+	group_count: number;
+	sample_paths: string[];
+	truncated: boolean;
+	note: string;
+}
+
+export interface ReclaimableStorageResponse {
+	path: string;
+	categories: ReclaimableCategory[];
+	total_estimated_bytes: number;
+	total_is_upper_bound: boolean;
+	message: string;
+}
+
 export interface AgentModelOption {
 	id: string;
 	label: string;

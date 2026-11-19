@@ -1,5 +1,6 @@
 """Tests for ``GET /api/disk/usage``, ``GET /api/disk/directory``,
-``GET /api/disk/explore``, ``GET /api/disk/count``, and ``GET /api/disk/info``.
+``GET /api/disk/explore``, ``GET /api/disk/count``, ``GET /api/disk/info``, and
+``GET /api/disk/reclaimable``.
 
 Use a fake MCP manager via ``dependency_overrides`` so the real subprocess is
 never spawned; the MCP connection itself is covered by integration tests.
@@ -55,6 +56,45 @@ COUNT_RESULT: dict[str, Any] = {
     "by_extension": {".py": 2, "(no extension)": 1},
 }
 
+DUPLICATES_RESULT: list[dict[str, Any]] = [
+    {"size_bytes": 100, "files": ["/Users/me/a.bin", "/Users/me/copy/a.bin"]},
+    {
+        "size_bytes": 50,
+        "files": ["/Users/me/b.bin", "/Users/me/copy/b.bin", "/Users/me/copy2/b.bin"],
+    },
+]
+
+JUNK_RESULT: dict[str, Any] = {
+    "path": "/Users/me",
+    "total_files": 2,
+    "total_bytes": 30,
+    "by_extension": {".log": 1, ".tmp": 1},
+    "directories": ["/Users/me/build"],
+    "sample": ["/Users/me/app.log", "/Users/me/cache.tmp"],
+    "truncated": False,
+}
+
+EMPTY_RESULT: dict[str, Any] = {
+    "path": "/Users/me",
+    "recursive": False,
+    "total_empty_directories": 3,
+    "sample": ["/Users/me/empty-a"],
+    "truncated": True,
+    "skipped_directories_count": 0,
+    "skipped_directories": [],
+}
+
+STALE_RESULT: list[dict[str, Any]] = [
+    {"path": "/Users/me/old.bin", "size_bytes": 70, "days_unmodified": 400.0}
+]
+
+RECLAIMABLE_RESULTS: dict[str, Any] = {
+    "find_duplicate_files": DUPLICATES_RESULT,
+    "find_junk_files": JUNK_RESULT,
+    "find_empty_directories": EMPTY_RESULT,
+    "find_stale_files": STALE_RESULT,
+}
+
 
 class FakeMCPClient:
     """Stands in for ``StorageMCPClient``; records calls and returns a canned
@@ -62,17 +102,21 @@ class FakeMCPClient:
 
     def __init__(
         self,
-        result: dict[str, Any] | None = None,
+        result: Any = None,
         error: Exception | None = None,
+        results: dict[str, Any] | None = None,
     ) -> None:
         self.result = USAGE_RESULT if result is None else result
         self.error = error
+        self.results = results
         self.calls: list[tuple[str, dict[str, Any]]] = []
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> Any:
         self.calls.append((name, arguments))
         if self.error is not None:
             raise self.error
+        if self.results is not None:
+            return self.results[name]
         return self.result
 
 
@@ -246,3 +290,68 @@ def test_info_passes_path_through() -> None:
     response = _disk_client(fake).get("/api/disk/info", params={"path": "/tmp"})
     assert response.status_code == 200
     assert fake.calls == [("file_info", {"path": "/tmp"})]
+
+
+def test_reclaimable_returns_categories_and_total() -> None:
+    fake = FakeMCPClient(results=RECLAIMABLE_RESULTS)
+    response = _disk_client(fake).get("/api/disk/reclaimable")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["path"] == "/Users/me"
+    assert payload["categories"][0]["category"] == "duplicates"
+    assert payload["categories"][0]["estimated_bytes"] == 200
+    assert payload["categories"][1]["estimated_bytes"] == 30
+    assert payload["categories"][2]["estimated_bytes"] == 0
+    assert payload["categories"][3]["estimated_bytes"] == 70
+    assert payload["total_estimated_bytes"] == 300
+    assert payload["total_is_upper_bound"] is True
+
+
+def test_reclaimable_calls_tools_with_defaults() -> None:
+    fake = FakeMCPClient(results=RECLAIMABLE_RESULTS)
+    _disk_client(fake).get("/api/disk/reclaimable")
+
+    assert fake.calls == [
+        ("find_duplicate_files", {"min_size_bytes": 1024}),
+        ("find_junk_files", {}),
+        ("find_empty_directories", {"recursive": False}),
+        ("find_stale_files", {"days_unmodified": 365, "max_results": 100}),
+    ]
+
+
+def test_reclaimable_passes_path_and_options() -> None:
+    fake = FakeMCPClient(results=RECLAIMABLE_RESULTS)
+    response = _disk_client(fake).get(
+        "/api/disk/reclaimable",
+        params={
+            "path": "/tmp",
+            "min_duplicate_bytes": 2048,
+            "stale_days": 30,
+            "max_stale_results": 5,
+        },
+    )
+
+    assert response.status_code == 200
+    assert fake.calls == [
+        ("find_duplicate_files", {"path": "/tmp", "min_size_bytes": 2048}),
+        ("find_junk_files", {"path": "/tmp"}),
+        ("find_empty_directories", {"path": "/tmp", "recursive": False}),
+        (
+            "find_stale_files",
+            {"path": "/tmp", "days_unmodified": 30, "max_results": 5},
+        ),
+    ]
+
+
+def test_reclaimable_tool_error_returns_400() -> None:
+    fake = FakeMCPClient(
+        results=RECLAIMABLE_RESULTS,
+        error=MCPToolError("find_duplicate_files", "path does not exist"),
+    )
+    response = _disk_client(fake).get("/api/disk/reclaimable")
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": {"tool": "find_duplicate_files", "message": "path does not exist"}
+    }

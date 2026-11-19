@@ -1,7 +1,8 @@
 """Pydantic request/response models shared across routers.
 
 The health payloads, the deterministic disk payloads (usage, directory, explore,
-count, info), the agent payloads, and the cleanup payloads are defined here.
+count, info, reclaimable), the agent payloads, and the cleanup payloads are
+defined here.
 """
 
 from typing import Any, Literal
@@ -89,6 +90,33 @@ class FileInfoResponse(BaseModel):
     modified: float
     created: float
     extension: str
+
+
+class ReclaimableCategory(BaseModel):
+    """One heuristic cleanup category in ``reclaimable_storage``.
+
+    ``estimated_bytes`` is a review aid, not a guaranteed saving:
+    categories can overlap, and no files are changed by this endpoint.
+    """
+
+    category: Literal["duplicates", "junk", "empty_directories", "other"]
+    label: str
+    estimated_bytes: int
+    item_count: int
+    group_count: int
+    sample_paths: list[str]
+    truncated: bool
+    note: str
+
+
+class ReclaimableStorageResponse(BaseModel):
+    """Aggregated cleanup candidates from four read-only MCP scans."""
+
+    path: str
+    categories: list[ReclaimableCategory]
+    total_estimated_bytes: int
+    total_is_upper_bound: bool = True
+    message: str
 
 
 class ReadinessResponse(BaseModel):

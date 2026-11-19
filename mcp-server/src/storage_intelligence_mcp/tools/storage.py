@@ -985,15 +985,17 @@ async def find_junk_files(
     matches by name. Directories match by exact name: `node_modules`,
     `__pycache__`, `dist`, `build`, `target`.
 
-    Output: `total_files`, `by_extension` (with `.ds_store` for `.DS_Store`),
-    the uncapped `directories` list, and a `sample` of file paths capped at 25,
-    with `truncated` when the sample is shorter than `total_files`.
-    `directories` is not included in the counts. Both `sample` and
-    `directories` are potential cleanup candidates, not deletion instructions.
+    Output: `total_files`, `total_bytes` (sum of matched file sizes),
+    `by_extension` (with `.ds_store` for `.DS_Store`), the uncapped
+    `directories` list, and a `sample` of file paths capped at 25, with
+    `truncated` when the sample is shorter than `total_files`. `directories`
+    is not included in the counts. Both `sample` and `directories` are
+    potential cleanup candidates, not deletion instructions.
 
     Limits: a name or extension match does not mean the file is unnecessary or
     safe to delete -- confirm with the user and inspect before removing. It
-    does not measure sizes, ages, or contents, and it does not recurse.
+    measures apparent file sizes but not build-directory contents, ages, or
+    file contents, and it does not recurse.
 
     Args:
         path: Absolute directory path to inspect. Defaults to the home directory.
@@ -1012,6 +1014,7 @@ async def find_junk_files(
         await ctx.info(f"Counting junk files and build directories in: {path}")
 
         total = 0
+        total_bytes = 0
         by_extension: dict[str, int] = {}
         directories: list[str] = []
         sample: list[str] = []
@@ -1035,6 +1038,10 @@ async def find_junk_files(
                 continue
 
             total += 1
+            try:
+                total_bytes += child.stat().st_size
+            except OSError:
+                pass
             by_extension[ext] = by_extension.get(ext, 0) + 1
 
             if len(sample) < SAMPLE_LIMIT:
@@ -1047,6 +1054,7 @@ async def find_junk_files(
         return {
             "path": str(p),
             "total_files": total,
+            "total_bytes": total_bytes,
             "by_extension": dict(
                 sorted(by_extension.items(), key=lambda x: (-x[1], x[0]))
             ),

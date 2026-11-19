@@ -120,6 +120,7 @@ Interactive API docs are served at `http://127.0.0.1:8000/docs`.
 | `GET /api/disk/explore` | `explore_directory` | `path` (optional), `pattern`, `search`, `kind`, `recursive`, `max_results` |
 | `GET /api/disk/count` | `count_files` | `path` (optional) |
 | `GET /api/disk/info` | `file_info` | `path` (optional) |
+| `GET /api/disk/reclaimable` | four read-only find tools | `path` (optional), `min_duplicate_bytes=1024`, `stale_days=365`, `max_stale_results=100`; heuristic byte estimates by category |
 | `GET /api/agent/models` | — | The selectable models; no MCP or provider key needed |
 | `POST /api/agent/analyze` | read-only agent | `{model, path?, question?}` → SSE stream (`tool_call`, `text_delta`, `complete`, `error`) |
 | `POST /api/cleanup/execute` | `trash_path(confirm=True)` | `{paths: [...]}` — the only mutating route |
@@ -148,9 +149,10 @@ temporarily dead MCP server does not look like a dead backend.
 
 ### Disk
 
-The five disk routes are deterministic — they call the MCP tool directly, with
-no LLM in the loop. Each returns the tool's structured payload, validated
-through a Pydantic response model.
+The deterministic disk routes call MCP tools directly, with no LLM in the loop.
+Each returns a structured payload validated through a Pydantic response model.
+`GET /api/disk/reclaimable` aggregates four read-only scans; its byte figures are
+heuristic upper bounds and no files are changed.
 
 ```jsonc
 // GET /api/disk/directory?path=/Users/me&top_n=5
@@ -160,6 +162,26 @@ through a Pydantic response model.
     { "name": "Downloads", "type": "directory", "size_bytes": 41234567 },
     { "name": "movie.mov", "type": "file", "size_bytes": 1048576 }
   ]
+}
+
+// GET /api/disk/reclaimable?path=/Users/me
+{
+  "path": "/Users/me",
+  "categories": [
+    {
+      "category": "duplicates",
+      "label": "Duplicate files",
+      "estimated_bytes": 2048,
+      "item_count": 2,
+      "group_count": 2,
+      "sample_paths": ["/Users/me/a.bin", "/Users/me/copy/a.bin"],
+      "truncated": false,
+      "note": "Assumes one copy per group is kept."
+    }
+  ],
+  "total_estimated_bytes": 2048,
+  "total_is_upper_bound": true,
+  "message": "Heuristic estimates only; categories can overlap. No files were changed."
 }
 ```
 
